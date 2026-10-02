@@ -12,11 +12,17 @@ export class DashboardController {
     // 2. Delegate sidebar navigation (e.g. #overview, #users)
     this.view.bindNavigation(this.handleNavigation.bind(this));
 
-    // 3. Handle initial section display based on URL hash
+    // 3. Delegate role inline edit and save actions
+    this.view.bindRoleActions({
+      onEdit: this.handleEditRole.bind(this),
+      onSave: this.handleSaveRole.bind(this)
+    });
+
+    // 4. Handle initial section display based on URL hash
     const initialHash = window.location.hash.replace('#', '') || 'overview';
     await this.handleNavigation(initialHash);
 
-    // 4. Initial metrics payload for overview
+    // 5. Initial metrics payload for overview
     const metrics = await this.model.fetchMetrics();
     this.view.renderMetrics(metrics);
   }
@@ -35,6 +41,28 @@ export class DashboardController {
     } else {
       // Default to overview section
       this.view.showSection('overview');
+    }
+  }
+
+  async handleEditRole(userId, currentRole) {
+    this.view.setRoleCellLoading(userId);
+    try {
+      const roles = await this.model.fetchRoles();
+      this.view.enableRoleEdit(userId, currentRole, roles);
+    } catch (err) {
+      console.error("DashboardController: Failed to fetch roles:", err);
+      this.view.cancelRoleEdit(userId, currentRole);
+    }
+  }
+
+  async handleSaveRole(userId, newRole) {
+    try {
+      await this.model.updateUserRole(userId, newRole);
+      this.view.renderUserRoleSaved(userId, newRole);
+    } catch (err) {
+      console.error("DashboardController: Failed to save user role:", err);
+      alert("Failed to update user role. Please try again.");
+      this.view.cancelRoleEdit(userId, this.model.getUserRole(userId));
     }
   }
 

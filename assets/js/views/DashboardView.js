@@ -10,6 +10,10 @@ export class DashboardView {
     this.usersSection = document.getElementById('section-users');
     this.usersTableContainer = document.getElementById('users-table-container');
     this.usersCountBadge = document.getElementById('users-count-badge');
+
+    // Callbacks for role editing
+    this.onEditRoleClick = null;
+    this.onSaveRoleClick = null;
   }
 
   bindSidebarToggle(handler) {
@@ -84,7 +88,6 @@ export class DashboardView {
       if (this.overviewSection) this.overviewSection.classList.add('hidden');
       if (this.usersSection) this.usersSection.classList.remove('hidden');
     } else {
-      // Default to overview
       if (this.overviewSection) this.overviewSection.classList.remove('hidden');
       if (this.usersSection) this.usersSection.classList.add('hidden');
     }
@@ -111,6 +114,11 @@ export class DashboardView {
         </div>
       `;
     }
+  }
+
+  bindRoleActions({ onEdit, onSave }) {
+    this.onEditRoleClick = onEdit;
+    this.onSaveRoleClick = onSave;
   }
 
   renderUsersTable(users) {
@@ -165,7 +173,7 @@ export class DashboardView {
       `;
 
       return `
-        <tr class="hover:bg-zinc-800/30 transition group">
+        <tr class="hover:bg-zinc-800/30 transition group" id="user-row-${user.id}">
           <!-- User / Avatar (No text, rendered as image) -->
           <td class="py-4 pl-4 sm:pl-6 pr-4">
             <div class="flex items-center gap-3.5">
@@ -182,21 +190,39 @@ export class DashboardView {
             ${this._escape(user.email)}
           </td>
 
-          <!-- Role -->
+          <!-- Role with Edit Button -->
           <td class="py-4 px-4">
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-800 text-zinc-300 border border-zinc-700 capitalize">
-              ${this._escape(user.role || 'user')}
-            </span>
+            <div id="role-cell-${user.id}" class="inline-flex items-center gap-2">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-800 text-zinc-300 border border-zinc-700 capitalize">
+                ${this._escape(user.role || 'user')}
+              </span>
+              <button 
+                type="button" 
+                class="edit-role-btn text-zinc-400 hover:text-white p-1 rounded-md hover:bg-zinc-800 transition" 
+                data-user-id="${user.id}" 
+                data-current-role="${this._escape(user.role || 'user')}" 
+                title="Edit Role"
+              >
+                <i class="fa-solid fa-pen-to-square text-xs pointer-events-none"></i>
+              </button>
+            </div>
           </td>
 
-          <!-- Clerk ID -->
+          <!-- Clerk Identity -->
           <td class="py-4 px-4">
             ${clerkBadge}
           </td>
 
           <!-- ID -->
-          <td class="py-4 pl-4 pr-4 sm:pr-6 text-right">
+          <td class="py-4 pl-4 pr-4 text-right">
             <span class="text-xs font-mono font-bold text-zinc-400">#${this._escape(user.id)}</span>
+          </td>
+
+          <!-- Actions: Save Button (Only available when editing) -->
+          <td class="py-4 pl-4 pr-4 sm:pr-6 text-right">
+            <div id="action-cell-${user.id}" class="inline-flex items-center justify-end min-h-[28px]">
+              <span class="text-xs text-zinc-600">—</span>
+            </div>
           </td>
         </tr>
       `;
@@ -223,7 +249,8 @@ export class DashboardView {
                   <th class="py-4 px-4 hidden sm:table-cell">Email</th>
                   <th class="py-4 px-4">Role</th>
                   <th class="py-4 px-4">Clerk Identity</th>
-                  <th class="py-4 pl-4 pr-4 sm:pr-6 text-right">ID</th>
+                  <th class="py-4 pl-4 pr-4 text-right">ID</th>
+                  <th class="py-4 pl-4 pr-4 sm:pr-6 text-right">Action</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-zinc-800/60">
@@ -241,6 +268,222 @@ export class DashboardView {
         </div>
       </div>
     `;
+
+    // Attach delegated table interactions
+    this._attachTableEvents();
+  }
+
+  _attachTableEvents() {
+    if (!this.usersTableContainer) return;
+
+    // Remove any previous listener by replacing clone or single handler
+    this.usersTableContainer.onclick = (e) => {
+      // 1. Edit Role Clicked
+      const editBtn = e.target.closest('.edit-role-btn');
+      if (editBtn) {
+        const userId = editBtn.dataset.userId;
+        const currentRole = editBtn.dataset.currentRole;
+        if (this.onEditRoleClick) {
+          this.onEditRoleClick(userId, currentRole);
+        }
+        return;
+      }
+
+      // 2. Cancel Role Clicked
+      const cancelBtn = e.target.closest('.cancel-role-btn');
+      if (cancelBtn) {
+        const userId = cancelBtn.dataset.userId;
+        const originalRole = cancelBtn.dataset.originalRole;
+        this.cancelRoleEdit(userId, originalRole);
+        return;
+      }
+
+      // 3. Save Role Clicked
+      const saveBtn = e.target.closest('.save-role-btn');
+      if (saveBtn && !saveBtn.disabled) {
+        const userId = saveBtn.dataset.userId;
+        const roleCell = document.getElementById(`role-cell-${userId}`);
+        const select = roleCell ? roleCell.querySelector('.role-dropdown') : null;
+        if (select && this.onSaveRoleClick) {
+          this.setSaveButtonLoading(userId);
+          this.onSaveRoleClick(userId, select.value);
+        }
+        return;
+      }
+    };
+
+    // Listen for select dropdown changes to conditionally toggle the Save button
+    this.usersTableContainer.onchange = (e) => {
+      const select = e.target.closest('.role-dropdown');
+      if (select) {
+        const userId = select.dataset.userId;
+        const originalRole = select.dataset.originalRole;
+        const hasChanged = select.value !== originalRole;
+        this.updateSaveButtonState(userId, hasChanged);
+      }
+    };
+  }
+
+  setRoleCellLoading(userId) {
+    const roleCell = document.getElementById(`role-cell-${userId}`);
+    if (roleCell) {
+      roleCell.innerHTML = `
+        <span class="inline-flex items-center gap-1.5 text-xs text-zinc-400">
+          <svg class="animate-spin h-3.5 w-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>Loading roles...</span>
+        </span>
+      `;
+    }
+  }
+
+  enableRoleEdit(userId, currentRole, roles) {
+    const roleCell = document.getElementById(`role-cell-${userId}`);
+    const actionCell = document.getElementById(`action-cell-${userId}`);
+
+    if (roleCell) {
+      const optionsHtml = roles.map(r => `
+        <option value="${this._escape(r)}" ${r === currentRole ? 'selected' : ''}>
+          ${this._formatRoleLabel(r)}
+        </option>
+      `).join('');
+
+      roleCell.innerHTML = `
+        <div class="inline-flex items-center gap-1.5">
+          <select 
+            class="role-dropdown bg-[#0d0d10] border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:border-zinc-500 capitalize shadow-inner cursor-pointer"
+            data-user-id="${userId}"
+            data-original-role="${currentRole}"
+          >
+            ${optionsHtml}
+          </select>
+          <button 
+            type="button" 
+            class="cancel-role-btn text-zinc-500 hover:text-zinc-300 p-1 rounded hover:bg-zinc-800 transition" 
+            data-user-id="${userId}" 
+            data-original-role="${currentRole}" 
+            title="Cancel"
+          >
+            <i class="fa-solid fa-xmark text-xs pointer-events-none"></i>
+          </button>
+        </div>
+      `;
+    }
+
+    if (actionCell) {
+      // Save button: Available ONLY because edit mode was pressed, but DISABLED until a change happens
+      actionCell.innerHTML = `
+        <button 
+          type="button" 
+          class="save-role-btn px-3 py-1 rounded-lg text-xs font-semibold transition bg-zinc-800 text-zinc-500 opacity-40 cursor-not-allowed border border-zinc-700" 
+          data-user-id="${userId}" 
+          disabled
+        >
+          Save
+        </button>
+      `;
+    }
+  }
+
+  updateSaveButtonState(userId, hasChanged) {
+    const actionCell = document.getElementById(`action-cell-${userId}`);
+    if (!actionCell) return;
+    const saveBtn = actionCell.querySelector('.save-role-btn');
+    if (!saveBtn) return;
+
+    if (hasChanged) {
+      saveBtn.disabled = false;
+      saveBtn.className = "save-role-btn px-3 py-1 rounded-lg text-xs font-semibold transition bg-white text-black hover:bg-zinc-200 cursor-pointer shadow-sm border border-white transform hover:scale-[1.02]";
+    } else {
+      saveBtn.disabled = true;
+      saveBtn.className = "save-role-btn px-3 py-1 rounded-lg text-xs font-semibold transition bg-zinc-800 text-zinc-500 opacity-40 cursor-not-allowed border border-zinc-700";
+    }
+  }
+
+  setSaveButtonLoading(userId) {
+    const actionCell = document.getElementById(`action-cell-${userId}`);
+    if (!actionCell) return;
+    const saveBtn = actionCell.querySelector('.save-role-btn');
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = `
+        <svg class="animate-spin h-3.5 w-3.5 inline text-black mr-1" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>Saving...</span>
+      `;
+    }
+  }
+
+  cancelRoleEdit(userId, originalRole) {
+    const roleCell = document.getElementById(`role-cell-${userId}`);
+    const actionCell = document.getElementById(`action-cell-${userId}`);
+
+    if (roleCell) {
+      roleCell.innerHTML = `
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-800 text-zinc-300 border border-zinc-700 capitalize">
+          ${this._escape(originalRole)}
+        </span>
+        <button 
+          type="button" 
+          class="edit-role-btn text-zinc-400 hover:text-white p-1 rounded-md hover:bg-zinc-800 transition" 
+          data-user-id="${userId}" 
+          data-current-role="${this._escape(originalRole)}" 
+          title="Edit Role"
+        >
+          <i class="fa-solid fa-pen-to-square text-xs pointer-events-none"></i>
+        </button>
+      `;
+    }
+
+    if (actionCell) {
+      actionCell.innerHTML = `<span class="text-xs text-zinc-600">—</span>`;
+    }
+  }
+
+  renderUserRoleSaved(userId, newRole) {
+    const roleCell = document.getElementById(`role-cell-${userId}`);
+    const actionCell = document.getElementById(`action-cell-${userId}`);
+
+    if (roleCell) {
+      roleCell.innerHTML = `
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 capitalize">
+          ${this._escape(newRole)}
+        </span>
+        <button 
+          type="button" 
+          class="edit-role-btn text-zinc-400 hover:text-white p-1 rounded-md hover:bg-zinc-800 transition" 
+          data-user-id="${userId}" 
+          data-current-role="${this._escape(newRole)}" 
+          title="Edit Role"
+        >
+          <i class="fa-solid fa-pen-to-square text-xs pointer-events-none"></i>
+        </button>
+      `;
+    }
+
+    if (actionCell) {
+      // Save button is no longer available once saved
+      actionCell.innerHTML = `
+        <span class="inline-flex items-center gap-1 text-xs text-emerald-400 font-medium">
+          <i class="fa-solid fa-check text-[10px]"></i> Saved
+        </span>
+      `;
+      setTimeout(() => {
+        if (actionCell) actionCell.innerHTML = `<span class="text-xs text-zinc-600">—</span>`;
+      }, 2000);
+    }
+  }
+
+  _formatRoleLabel(role) {
+    if (!role) return '';
+    return role
+      .split('_')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
   }
 
   _escape(str) {

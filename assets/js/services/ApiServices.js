@@ -39,4 +39,34 @@ export class ApiService {
 
     return await response.json();
   }
+
+  async fetchRoles() {
+    const headers = await this.getHeaders();
+    const response = await fetch(`${CONFIG.API_BASE_URL}/users/roles`, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch roles: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data : (data.roles || ['user', 'admin', 'super_admin']);
+  }
+
+  async updateUserRole(userId, role) {
+    const headers = await this.getHeaders();
+    const response = await fetch(`${CONFIG.API_BASE_URL}/users/${userId}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ role })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update user role: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
 }

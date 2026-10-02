@@ -3,6 +3,7 @@ import { ApiService } from '../services/ApiServices.js';
 export class DashboardModel {
   constructor() {
     this.apiService = new ApiService();
+    this.cachedRoles = null;
 
     this.metrics = {
       activeBots: 3,
@@ -67,6 +68,8 @@ export class DashboardModel {
         "imageUrl": null
       }
     ];
+
+    this.currentUsers = [...this.fallbackUsers];
   }
 
   async fetchMetrics() {
@@ -84,6 +87,7 @@ export class DashboardModel {
     try {
       const data = await this.apiService.fetchUsers();
       if (Array.isArray(data)) {
+        this.currentUsers = data;
         return data;
       }
       return this.fallbackUsers;
@@ -91,5 +95,46 @@ export class DashboardModel {
       console.warn("ApiService.fetchUsers failed, using fallback dataset:", err);
       return this.fallbackUsers;
     }
+  }
+
+  /**
+   * Fetches available roles from /users/roles
+   */
+  async fetchRoles() {
+    if (this.cachedRoles) {
+      return this.cachedRoles;
+    }
+
+    try {
+      const roles = await this.apiService.fetchRoles();
+      this.cachedRoles = roles;
+      return roles;
+    } catch (err) {
+      console.warn("ApiService.fetchRoles failed, using default roles:", err);
+      return ['user', 'admin', 'super_admin'];
+    }
+  }
+
+  /**
+   * Updates a user's role on the backend
+   */
+  async updateUserRole(userId, newRole) {
+    try {
+      const updatedUser = await this.apiService.updateUserRole(userId, newRole);
+      // Update in-memory user list
+      const u = this.currentUsers.find(item => item.id === Number(userId));
+      if (u) u.role = newRole;
+      return updatedUser;
+    } catch (err) {
+      console.warn("ApiService.updateUserRole failed, updating locally:", err);
+      const u = this.currentUsers.find(item => item.id === Number(userId));
+      if (u) u.role = newRole;
+      return u || { id: userId, role: newRole };
+    }
+  }
+
+  getUserRole(userId) {
+    const u = this.currentUsers.find(item => item.id === Number(userId));
+    return u ? u.role : 'user';
   }
 }

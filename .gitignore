@@ -1,0 +1,12 @@
+# Environment variables & secrets (CRITICAL: Never commit to Git)
+.env
+.env*.local
+.env.development
+.env.production
+
+# Dependencies
+node_modules/
+
+# OS metadata
+.DS_Store
+Thumbs.db

@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html.dark {
+    color-scheme: dark;
+  }
+}
+/* Force-hide the Clerk watermark that breaks the custom flex layout */
+.cl-card [class*="cl-internal-"]:has(a[href*="clerk.com"]) {
+  display: none !important;
+}
+
+/* Fallback for the specific hashed class in your screenshot */
+.cl-internal-1hmariv {
+  display: none !important;
+}
+/* Base Canvas & Architectural Grid Pattern */
+body {
+  background-color: #09090b;
+  color: #f4f4f5;
+  background-image: linear-gradient(to right, #18181b 1px, transparent 1px),
+                    linear-gradient(to bottom, #18181b 1px, transparent 1px);
+  background-size: 4rem 4rem;
+  background-position: center top;
+}
+
+/* Bento Grid Card Architecture & Hover Physics */
+.bento-card {
+  background: #111114;
+  border: 1px solid #27272a;
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.4), 0 2px 6px -1px rgba(0, 0, 0, 0.2);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bento-card:hover {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+  transform: translateY(-4px);
+  border-color: #3f3f46;
+}
+
+/* Floating Dock Glassmorphism Styling */
+.awwwards-dock {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.dock-link {
+  transition: all 0.2s ease;
+}
+
+.dock-link:hover {
+  background-color: #202024;
+  color: #ffffff;
+}
+
+/* Dashboard Sidebar Item Interactions */
+.sidebar-link {
+  transition: all 0.2s ease;
+}
+
+.sidebar-link:hover,
+.sidebar-link.active {
+  background-color: #1a1a1f;
+  color: #ffffff;
+  border-color: #3f3f46;
+}
+
+/* Scrollbar Suppression Utilities */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

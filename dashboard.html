@@ -189,6 +189,9 @@
     <!-- MAIN DASHBOARD CONTENT -->
     <main class="flex-1 p-6 md:p-8 space-y-8 max-w-7xl mx-auto w-full">
 
+      <!-- SECTION: OVERVIEW -->
+      <section id="section-overview" class="space-y-8">
+
       <!-- DASHBOARD TITLE & TIMEFRAME HEADER -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -437,6 +440,32 @@
         </div>
 
       </div>
+
+      </section>
+
+      <!-- SECTION: USERS -->
+      <section id="section-users" class="space-y-8 hidden">
+        <!-- USERS TITLE & ACTIONS HEADER -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+              User Directory
+            </h1>
+            <p class="text-xs sm:text-sm text-zinc-400 mt-1">
+              All registered users, authentication providers, and workspace access roles.
+            </p>
+          </div>
+
+          <!-- Total Count Badge -->
+          <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#111114] border border-zinc-800 text-xs text-zinc-300 font-medium">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span id="users-count-badge">Loading users...</span>
+          </div>
+        </div>
+
+        <!-- USERS TABLE CONTAINER -->
+        <div id="users-table-container"></div>
+      </section>
 
     </main>
 

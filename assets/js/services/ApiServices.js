@@ -1,21 +1,32 @@
-// assets/js/services/ApiService.js
+// assets/js/services/ApiServices.js
 
 import { CONFIG } from '../config.js';
+
 export class ApiService {
   static async getHeaders() {
-    if (!window.Clerk || !window.Clerk.session) {
-      throw new Error('User is not authenticated');
-    }
-    // Get the fresh JWT token directly from Clerk
-    const token = await window.Clerk.session.getToken();
-
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
+    const headers = {
+      'Content-Type': 'application/json'
     };
+
+    if (window.Clerk && window.Clerk.session) {
+      try {
+        const token = await window.Clerk.session.getToken();
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+      } catch (err) {
+        console.warn("Could not retrieve Clerk session token:", err);
+      }
+    }
+
+    return headers;
   }
 
-    async fetchUsers() {
+  async getHeaders() {
+    return ApiService.getHeaders();
+  }
+
+  async fetchUsers() {
     const headers = await this.getHeaders();
     const response = await fetch(`${CONFIG.API_BASE_URL}/users/`, {
       method: 'GET',
@@ -23,7 +34,7 @@ export class ApiService {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch orders: ${response.statusText}`);
+      throw new Error(`Failed to fetch users: ${response.statusText}`);
     }
 
     return await response.json();

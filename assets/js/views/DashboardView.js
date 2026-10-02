@@ -60,4 +60,20 @@ export class DashboardView {
     // In a full implementation, you would assign unique IDs to metric cards to inject values directly here.
     console.log("DashboardView: Rendered metrics dynamically.", metrics);
   }
+
+  static renderAllUsers(users)
+  {
+    const container = document.getElementById('users-stream');
+    if (!container) return;
+
+    if (users.length === 0) {
+      container.innerHTML = `<p class="text-xs text-zinc-500">No Users Avaiable...</p>`;
+      return;
+    }
+
+    container.innerHTML = users.map(user => `
+
+    `).join('');
+  }
+
 }

@@ -1,3 +1,5 @@
+import { ApiService } from '../services/ApiService.js';
+import { DashboardView } from '../views/DashboardView.js';
 export class DashboardController {
   constructor(model, view) {
     this.model = model;
@@ -13,6 +15,7 @@ export class DashboardController {
     // Initial Data Payload
     const metrics = await this.model.fetchMetrics();
     this.view.renderMetrics(metrics);
+    
   }
 
   async handleTimeframeChange(timeframe) {
@@ -21,4 +24,6 @@ export class DashboardController {
     const metrics = await this.model.fetchMetrics(); 
     this.view.renderMetrics(metrics);
   }
+
+
 }

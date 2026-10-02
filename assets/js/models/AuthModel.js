@@ -1,4 +1,4 @@
-import { CONFIG } from '../config.js';
+import { CONFIG, getAppUrl } from '../config.js';
 
 export class AuthModel {
   constructor() {
@@ -33,16 +33,19 @@ export class AuthModel {
     this.clerk = window.Clerk;
 
     try {
-      const dashboardUrl = window.location.protocol === 'file:' ? 'dashboard.html' : '/dashboard.html';
-      const homeUrl = window.location.protocol === 'file:' ? 'index.html' : '/index.html';
-      
+      const dashboardUrl = getAppUrl('dashboard.html');
+      const homeUrl = getAppUrl('index.html');
+      const signInUrl = getAppUrl('signin.html');
+      const signUpUrl = getAppUrl('signup.html');
+
       await this.clerk.load({
         publishableKey: CONFIG.CLERK_PUBLISHABLE_KEY,
+        allowedRedirectOrigins: [window.location.origin, 'http://localhost:3000', 'https://mada61988.github.io'],
         afterSignInUrl: dashboardUrl,
         afterSignUpUrl: dashboardUrl,
         afterSignOutUrl: homeUrl,
-        signInUrl: window.location.protocol === 'file:' ? 'signin.html' : '/signin.html',
-        signUpUrl: window.location.protocol === 'file:' ? 'signup.html' : '/signup.html'
+        signInUrl: signInUrl,
+        signUpUrl: signUpUrl
       });
       this.isReady = true;
     } catch (error) {

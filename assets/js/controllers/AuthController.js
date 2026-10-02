@@ -1,3 +1,5 @@
+import { getAppUrl } from '../config.js';
+
 export class AuthController {
   constructor(model, view) {
     this.model = model;
@@ -15,9 +17,9 @@ export class AuthController {
     const isDashboard = path.includes('dashboard.html') || path.endsWith('/dashboard');
     const isSignIn = path.includes('signin.html') || path.endsWith('/signin');
     const isSignUp = path.includes('signup.html') || path.endsWith('/signup');
-    const homeUrl = window.location.protocol === 'file:' ? 'index.html' : '/index.html';
-    const signinUrl = window.location.protocol === 'file:' ? 'signin.html' : '/signin.html';
-    const dashboardUrl = window.location.protocol === 'file:' ? 'dashboard.html' : '/dashboard.html';
+    const homeUrl = getAppUrl('index.html');
+    const signinUrl = getAppUrl('signin.html');
+    const dashboardUrl = getAppUrl('dashboard.html');
 
     // Strict Route Protection Guard (Initial Load)
     if (!this.model.user && isDashboard) {

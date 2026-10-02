@@ -1,3 +1,5 @@
+import { getAppUrl } from '../config.js';
+
 export class AuthView {
   constructor() {
     this.clerkAppearance = {
@@ -33,8 +35,8 @@ export class AuthView {
     const container = document.getElementById('sign-in-container');
     if (container && clerk) {
       container.innerHTML = ''; // Clear spinner
-      const dashboardUrl = window.location.protocol === 'file:' ? 'dashboard.html' : '/dashboard.html';
-      const signUpUrl = window.location.protocol === 'file:' ? 'signup.html' : '/signup.html';
+      const dashboardUrl = getAppUrl('dashboard.html');
+      const signUpUrl = getAppUrl('signup.html');
 
       clerk.mountSignIn(container, { 
         appearance: this.clerkAppearance,
@@ -51,8 +53,8 @@ export class AuthView {
     const container = document.getElementById('sign-up-container');
     if (container && clerk) {
       container.innerHTML = ''; // Clear spinner
-      const dashboardUrl = window.location.protocol === 'file:' ? 'dashboard.html' : '/dashboard.html';
-      const signInUrl = window.location.protocol === 'file:' ? 'signin.html' : '/signin.html';
+      const dashboardUrl = getAppUrl('dashboard.html');
+      const signInUrl = getAppUrl('signin.html');
 
       clerk.mountSignUp(container, { 
         appearance: this.clerkAppearance,
@@ -68,7 +70,7 @@ export class AuthView {
   mountUserButton(clerk) {
     const container = document.getElementById('user-button');
     if (container && clerk) {
-      const homeUrl = window.location.protocol === 'file:' ? 'index.html' : '/index.html';
+      const homeUrl = getAppUrl('index.html');
       clerk.mountUserButton(container, {
         afterSignOutUrl: homeUrl,
         appearance: {

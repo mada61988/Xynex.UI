@@ -156,37 +156,46 @@ export class DashboardController {
 
   async handleWorkspaceSelection(selectedId) {
     this.currentSelectedWorkspaceId = selectedId;
+    this.view.showPageLoading("Syncing workspace data...");
 
-    if (selectedId === 'all') {
-      // 1. Render overall channels metric across all workspaces
-      if (this.cachedOverallData) {
-        this.view.renderChannelsMetric({
-          totalChannels: this.cachedOverallData.totalChannels,
-          activeChannels: this.cachedOverallData.activeChannels,
-          percentageOperational: this.cachedOverallData.percentageOperational
-        });
+    try {
+      if (selectedId === 'all') {
+        // 1. Render overall channels metric across all workspaces
+        if (this.cachedOverallData) {
+          this.view.renderChannelsMetric({
+            totalChannels: this.cachedOverallData.totalChannels,
+            activeChannels: this.cachedOverallData.activeChannels,
+            percentageOperational: this.cachedOverallData.percentageOperational
+          });
+        }
+
+        // 2. Fetch overall user messages count
+        await this.loadMessagesCount();
+        return;
       }
 
-      // 2. Fetch overall user messages count
-      await this.loadMessagesCount();
-      return;
+      // A specific workspace is chosen:
+      // Concurrently fetch channels and messages until all data is retrieved
+      await Promise.allSettled([
+        (async () => {
+          this.view.setChannelsLoading();
+          try {
+            const channelData = await this.model.fetchWorkspaceChannels(selectedId);
+            this.view.renderChannelsMetric(channelData);
+          } catch (err) {
+            console.error(`DashboardController: Error fetching channels for workspace ${selectedId}:`, err);
+            const serverMessage = err.serverMessage || err.message || "Failed to load workspace channels";
+            this.view.renderChannelsError(serverMessage);
+          }
+        })(),
+        (async () => {
+          await this.loadWorkspaceMessagesCount(selectedId);
+        })()
+      ]);
+    } finally {
+      // Hide the centered loading spinner once all data is fetched
+      this.view.hidePageLoading();
     }
-
-    // A specific workspace is chosen:
-    // 1. In the channels card, use /channels/workspace/:workspaceId
-    this.view.setChannelsLoading();
-    try {
-      const channelData = await this.model.fetchWorkspaceChannels(selectedId);
-      this.view.renderChannelsMetric(channelData);
-    } catch (err) {
-      console.error(`DashboardController: Error fetching channels for workspace ${selectedId}:`, err);
-      const serverMessage = err.serverMessage || err.message || "Failed to load workspace channels";
-      this.view.renderChannelsError(serverMessage);
-    }
-
-    // 2. In the messages card, use /chats/workspace/:workspaceId/messages
-    // 3. Reads { messageCount } returned by the endpoint
-    await this.loadWorkspaceMessagesCount(selectedId);
   }
 
   async handleNavigation(target) {

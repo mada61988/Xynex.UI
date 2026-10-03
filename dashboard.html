@@ -37,6 +37,18 @@
   <!-- MOBILE SIDEBAR BACKDROP -->
   <div id="sidebar-backdrop" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden lg:hidden"></div>
 
+  <!-- WORKSPACE SWITCHING SPINNER OVERLAY -->
+  <div id="page-loading-overlay" class="fixed inset-0 bg-[#09090b]/75 backdrop-blur-md z-50 flex flex-col items-center justify-center gap-4 transition-all duration-200 hidden">
+    <div class="relative flex items-center justify-center">
+      <div class="w-14 h-14 rounded-full border-2 border-zinc-800 border-t-white animate-spin"></div>
+      <div class="absolute w-2.5 h-2.5 bg-white rounded-full animate-pulse"></div>
+    </div>
+    <div class="flex flex-col items-center text-center">
+      <span id="page-loading-text" class="text-sm font-semibold text-white tracking-tight">Syncing workspace data...</span>
+      <span class="text-xs text-zinc-500 mt-0.5">Fetching channels and telemetry from database</span>
+    </div>
+  </div>
+
   <!-- LEFT-HAND VERTICAL SIDEBAR -->
   <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-72 bg-[#111114] border-r border-[#27272a] flex flex-col justify-between p-6 -translate-x-full lg:translate-x-0 transition-transform duration-300">
     <div>

@@ -21,11 +21,30 @@ export class DashboardView {
     this.selectedWorkspaceId = 'all';
     this.onWorkspaceSelectCallback = null;
 
+    // Page-level centered loading overlay
+    this.pageLoadingOverlay = document.getElementById('page-loading-overlay');
+    this.pageLoadingText = document.getElementById('page-loading-text');
+
     // Callbacks for role editing
     this.onEditRoleClick = null;
     this.onSaveRoleClick = null;
 
     this._bindWorkspacesDropdownEvents();
+  }
+
+  showPageLoading(message = "Syncing workspace data...") {
+    if (this.pageLoadingText && message) {
+      this.pageLoadingText.textContent = message;
+    }
+    if (this.pageLoadingOverlay) {
+      this.pageLoadingOverlay.classList.remove('hidden');
+    }
+  }
+
+  hidePageLoading() {
+    if (this.pageLoadingOverlay) {
+      this.pageLoadingOverlay.classList.add('hidden');
+    }
   }
 
   _bindWorkspacesDropdownEvents() {

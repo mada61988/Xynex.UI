@@ -268,24 +268,66 @@ export class DashboardView {
       return;
     }
 
-    // Determine initial selected profile: prefer active, otherwise first
-    let selected = profiles.find(p => p.id === this.selectedProfileId);
-    if (!selected) {
-      selected = profiles.find(p => Boolean(p.isActive)) || profiles[0];
-      this.selectedProfileId = selected.id;
+    // Default to 'all' if not set or if 'all' is selected
+    if (!this.selectedProfileId) {
+      this.selectedProfileId = 'all';
     }
 
-    const selectedName = selected.username || selected.name || selected.handle || selected.title || `Profile #${selected.id}`;
-    if (this.selectedChannelIcon) {
-      this.selectedChannelIcon.innerHTML = this._getChannelIcon(selected.channel || selected.chanell);
-    }
-    this.selectedChannelName.textContent = selectedName;
+    const isAllSelected = this.selectedProfileId === 'all';
+    let selectedProfile = null;
 
-    // Build the dropdown items
-    this.channelsList.innerHTML = profiles.map(p => {
+    if (isAllSelected) {
+      if (this.selectedChannelIcon) {
+        this.selectedChannelIcon.innerHTML = this._getChannelIcon('all');
+      }
+      this.selectedChannelName.textContent = 'All Channels';
+    } else {
+      selectedProfile = profiles.find(p => p.id === this.selectedProfileId);
+      if (selectedProfile) {
+        const name = selectedProfile.username || selectedProfile.name || selectedProfile.handle || selectedProfile.title || `Profile #${selectedProfile.id}`;
+        if (this.selectedChannelIcon) {
+          this.selectedChannelIcon.innerHTML = this._getChannelIcon(selectedProfile.channel || selectedProfile.chanell);
+        }
+        this.selectedChannelName.textContent = name;
+      } else {
+        this.selectedProfileId = 'all';
+        if (this.selectedChannelIcon) {
+          this.selectedChannelIcon.innerHTML = this._getChannelIcon('all');
+        }
+        this.selectedChannelName.textContent = 'All Channels';
+      }
+    }
+
+    // 1. "All Channels" option at the top of the list
+    const allOptionHtml = `
+      <button 
+        type="button" 
+        class="channel-item w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs hover:bg-zinc-800/70 transition text-left cursor-pointer ${isAllSelected ? 'bg-zinc-800/90 text-white font-semibold' : 'text-zinc-300'}"
+        data-profile-id="all"
+        data-channel="all"
+        data-name="All Channels"
+      >
+        <div class="flex items-center gap-2.5 min-w-0 pr-2">
+          <span class="text-sm shrink-0">${this._getChannelIcon('all')}</span>
+          <div class="truncate">
+            <div class="truncate text-white font-medium">All Channels</div>
+            <div class="text-[10px] text-zinc-500">Overall channels</div>
+          </div>
+        </div>
+        <div class="shrink-0">
+          <span class="text-[10px] font-semibold text-zinc-300 bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700">
+            ${profiles.length} Total
+          </span>
+        </div>
+      </button>
+      <div class="border-t border-zinc-800/80 my-1"></div>
+    `;
+
+    // 2. Individual channel profile options
+    const profilesHtml = profiles.map(p => {
       const name = p.username || p.name || p.handle || p.title || `Profile #${p.id}`;
       const channel = p.channel || p.chanell || 'unknown';
-      const isSelected = p.id === selected.id;
+      const isSelected = p.id === this.selectedProfileId;
       const activeBadge = p.isActive 
         ? `<span class="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20"><span class="w-1 h-1 rounded-full bg-emerald-400"></span>Active</span>`
         : `<span class="text-[10px] text-zinc-500 bg-zinc-800/80 px-1.5 py-0.5 rounded border border-zinc-700/60">Offline</span>`;
@@ -311,11 +353,15 @@ export class DashboardView {
         </button>
       `;
     }).join('');
+
+    this.channelsList.innerHTML = allOptionHtml + profilesHtml;
   }
 
   _getChannelIcon(channel) {
     const ch = String(channel || '').toLowerCase().trim();
     switch (ch) {
+      case 'all':
+        return `<i class="fa-solid fa-layer-group text-zinc-300"></i>`;
       case 'instagram':
         return `<i class="fa-brands fa-instagram text-pink-500"></i>`;
       case 'facebook':

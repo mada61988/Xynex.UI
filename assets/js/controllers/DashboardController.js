@@ -30,11 +30,15 @@ export class DashboardController {
     // 6. Fetch dynamic messages handled count for current Clerk user
     await this.loadMessagesCount();
 
-    // 7. Re-fetch if auth state updates dynamically
+    // 7. Fetch dynamic profiles metric for current Clerk user
+    await this.loadProfilesMetric();
+
+    // 8. Re-fetch if auth state updates dynamically
     if (this.authModel) {
       this.authModel.onAuthStateChange(({ user }) => {
         if (user && user.id) {
           this.loadMessagesCount();
+          this.loadProfilesMetric();
         }
       });
     }
@@ -42,10 +46,41 @@ export class DashboardController {
 
   async loadMessagesCount() {
     const clerkId = this.authModel?.user?.id || window.Clerk?.user?.id;
-    if (clerkId) {
-      this.view.setMessagesCountLoading();
+    if (!clerkId) {
+      this.view.renderMessagesCountError("Authentication required");
+      return;
+    }
+
+    this.view.setMessagesCountLoading();
+    try {
       const count = await this.model.fetchMessagesCount(clerkId);
       this.view.renderMessagesCount(count);
+    } catch (err) {
+      console.error("DashboardController: Error loading messages count:", err);
+      const serverMessage = err.serverMessage || err.message || "Server did not respond";
+      this.view.renderMessagesCountError(serverMessage);
+    }
+  }
+
+  async loadProfilesMetric() {
+    const clerkId = this.authModel?.user?.id || window.Clerk?.user?.id;
+    if (!clerkId) {
+      this.view.renderProfilesError("Authentication required");
+      this.view.renderChannelsDropdown([], "Authentication required");
+      return;
+    }
+
+    this.view.setProfilesLoading();
+    try {
+      // Calls fetchUserProfiles once and stores the profiles to avoid redundant API requests
+      const profilesData = await this.model.fetchUserProfiles(clerkId);
+      this.view.renderProfilesMetric(profilesData);
+      this.view.renderChannelsDropdown(profilesData.profiles || []);
+    } catch (err) {
+      console.error("DashboardController: Error loading profiles metric:", err);
+      const serverMessage = err.serverMessage || err.message || "Server did not respond";
+      this.view.renderProfilesError(serverMessage);
+      this.view.renderChannelsDropdown([], serverMessage);
     }
   }
 

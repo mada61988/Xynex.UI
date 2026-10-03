@@ -11,9 +11,67 @@ export class DashboardView {
     this.usersTableContainer = document.getElementById('users-table-container');
     this.usersCountBadge = document.getElementById('users-count-badge');
 
+    // Channels dropdown elements
+    this.channelsWrapper = document.getElementById('channels-dropdown-wrapper');
+    this.channelsBtn = document.getElementById('channels-dropdown-btn');
+    this.channelsMenu = document.getElementById('channels-dropdown-menu');
+    this.channelsList = document.getElementById('channels-dropdown-list');
+    this.selectedChannelIcon = document.getElementById('selected-channel-icon');
+    this.selectedChannelName = document.getElementById('selected-channel-name');
+    this.selectedProfileId = null;
+
     // Callbacks for role editing
     this.onEditRoleClick = null;
     this.onSaveRoleClick = null;
+
+    this._bindChannelsDropdownEvents();
+  }
+
+  _bindChannelsDropdownEvents() {
+    if (this.channelsBtn && this.channelsMenu) {
+      this.channelsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.channelsMenu.classList.toggle('hidden');
+      });
+
+      document.addEventListener('click', (e) => {
+        if (this.channelsWrapper && !this.channelsWrapper.contains(e.target)) {
+          this.channelsMenu.classList.add('hidden');
+        }
+      });
+    }
+
+    if (this.channelsList) {
+      this.channelsList.addEventListener('click', (e) => {
+        const item = e.target.closest('.channel-item');
+        if (item) {
+          const profileId = Number(item.dataset.profileId) || item.dataset.profileId;
+          const channel = item.dataset.channel;
+          const name = item.dataset.name;
+
+          this.selectedProfileId = profileId;
+          if (this.selectedChannelIcon) {
+            this.selectedChannelIcon.innerHTML = this._getChannelIcon(channel);
+          }
+          if (this.selectedChannelName) {
+            this.selectedChannelName.textContent = name;
+          }
+          if (this.channelsMenu) {
+            this.channelsMenu.classList.add('hidden');
+          }
+
+          this.channelsList.querySelectorAll('.channel-item').forEach(btn => {
+            if (btn === item) {
+              btn.classList.add('bg-zinc-800/90', 'text-white', 'font-semibold');
+              btn.classList.remove('text-zinc-300');
+            } else {
+              btn.classList.remove('bg-zinc-800/90', 'text-white', 'font-semibold');
+              btn.classList.add('text-zinc-300');
+            }
+          });
+        }
+      });
+    }
   }
 
   bindSidebarToggle(handler) {
@@ -95,22 +153,215 @@ export class DashboardView {
   }
 
   renderMetrics(metrics) {
-    if (metrics && metrics.messagesHandled !== undefined) {
-      this.renderMessagesCount(metrics.messagesHandled);
+    console.log("DashboardView: Telemetry ready.");
+  }
+
+  setProfilesLoading() {
+    const card = document.getElementById('card-metric-profiles');
+    const icon = document.getElementById('icon-metric-profiles');
+    if (card) card.classList.remove('border-rose-500/30');
+    if (icon) {
+      icon.className = "w-8 h-8 rounded-lg bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-white transition";
     }
-    console.log("DashboardView: Rendered metrics dynamically.", metrics);
+
+    const elCount = document.getElementById('metric-profiles-count');
+    if (elCount) {
+      elCount.className = "text-3xl font-extrabold text-white tracking-tight mb-2";
+      elCount.innerHTML = `
+        <span class="inline-flex items-center gap-2">
+          <svg class="animate-spin h-6 w-6 text-zinc-400 inline" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </span>
+      `;
+    }
+
+    const elPercentage = document.getElementById('metric-profiles-percentage');
+    if (elPercentage) {
+      elPercentage.className = "text-zinc-500 font-medium flex items-center gap-1";
+      elPercentage.textContent = "Connecting to API...";
+    }
+  }
+
+  renderProfilesMetric({ total, active, percentage }) {
+    const card = document.getElementById('card-metric-profiles');
+    const icon = document.getElementById('icon-metric-profiles');
+    if (card) card.classList.remove('border-rose-500/30');
+    if (icon) {
+      icon.className = "w-8 h-8 rounded-lg bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-white transition";
+    }
+
+    const elCount = document.getElementById('metric-profiles-count');
+    const elPercentage = document.getElementById('metric-profiles-percentage');
+    const elSubtext = document.getElementById('metric-profiles-subtext');
+
+    if (elCount) {
+      elCount.className = "text-3xl font-extrabold text-white tracking-tight mb-2";
+      elCount.textContent = `${total} / ${active}`;
+    }
+
+    if (elPercentage) {
+      const pct = Math.round(Number(percentage) || 0);
+      elPercentage.innerHTML = `
+        <i class="fa-solid fa-circle-check text-[10px]"></i> ${pct}% Operational
+      `;
+      if (pct > 0) {
+        elPercentage.className = "text-emerald-400 font-semibold flex items-center gap-1";
+      } else {
+        elPercentage.className = "text-zinc-400 font-semibold flex items-center gap-1";
+      }
+    }
+
+    if (elSubtext) {
+      elSubtext.textContent = `· ${active} Active of ${total}`;
+    }
+  }
+
+  renderProfilesError(errorMessage) {
+    const card = document.getElementById('card-metric-profiles');
+    const icon = document.getElementById('icon-metric-profiles');
+    if (card) card.classList.add('border-rose-500/30');
+    if (icon) {
+      icon.className = "w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 transition";
+    }
+
+    const elCount = document.getElementById('metric-profiles-count');
+    const elPercentage = document.getElementById('metric-profiles-percentage');
+    const elSubtext = document.getElementById('metric-profiles-subtext');
+
+    if (elCount) {
+      elCount.className = "text-2xl font-bold text-rose-400 tracking-tight mb-2 flex items-center gap-2";
+      elCount.innerHTML = `
+        <i class="fa-solid fa-circle-exclamation text-lg"></i>
+        <span>Unavailable</span>
+      `;
+    }
+
+    if (elPercentage) {
+      elPercentage.className = "text-rose-400 font-medium flex items-center gap-1.5 truncate max-w-[220px]";
+      elPercentage.title = errorMessage || 'Server did not respond';
+      elPercentage.innerHTML = `
+        <span class="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0 animate-pulse"></span>
+        <span class="truncate text-xs">${this._escape(errorMessage || 'Server did not respond')}</span>
+      `;
+    }
+
+    if (elSubtext) {
+      elSubtext.textContent = '';
+    }
+  }
+
+  renderChannelsDropdown(profiles, errorMessage = null) {
+    if (!this.channelsList || !this.selectedChannelName) return;
+
+    if (errorMessage || !profiles || profiles.length === 0) {
+      if (this.selectedChannelIcon) {
+        this.selectedChannelIcon.innerHTML = `<i class="fa-solid fa-circle-nodes text-zinc-500"></i>`;
+      }
+      this.selectedChannelName.textContent = errorMessage ? 'Channels Error' : 'No Channels';
+      this.channelsList.innerHTML = `
+        <div class="px-3 py-2 text-xs text-zinc-500 text-center">
+          ${this._escape(errorMessage || 'No channels available')}
+        </div>
+      `;
+      return;
+    }
+
+    // Determine initial selected profile: prefer active, otherwise first
+    let selected = profiles.find(p => p.id === this.selectedProfileId);
+    if (!selected) {
+      selected = profiles.find(p => Boolean(p.isActive)) || profiles[0];
+      this.selectedProfileId = selected.id;
+    }
+
+    const selectedName = selected.username || selected.name || selected.handle || selected.title || `Profile #${selected.id}`;
+    if (this.selectedChannelIcon) {
+      this.selectedChannelIcon.innerHTML = this._getChannelIcon(selected.channel || selected.chanell);
+    }
+    this.selectedChannelName.textContent = selectedName;
+
+    // Build the dropdown items
+    this.channelsList.innerHTML = profiles.map(p => {
+      const name = p.username || p.name || p.handle || p.title || `Profile #${p.id}`;
+      const channel = p.channel || p.chanell || 'unknown';
+      const isSelected = p.id === selected.id;
+      const activeBadge = p.isActive 
+        ? `<span class="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20"><span class="w-1 h-1 rounded-full bg-emerald-400"></span>Active</span>`
+        : `<span class="text-[10px] text-zinc-500 bg-zinc-800/80 px-1.5 py-0.5 rounded border border-zinc-700/60">Offline</span>`;
+
+      return `
+        <button 
+          type="button" 
+          class="channel-item w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs hover:bg-zinc-800/70 transition text-left cursor-pointer ${isSelected ? 'bg-zinc-800/90 text-white font-semibold' : 'text-zinc-300'}"
+          data-profile-id="${p.id}"
+          data-channel="${this._escape(channel)}"
+          data-name="${this._escape(name)}"
+        >
+          <div class="flex items-center gap-2.5 min-w-0 pr-2">
+            <span class="text-sm shrink-0">${this._getChannelIcon(channel)}</span>
+            <div class="truncate">
+              <div class="truncate text-white font-medium">${this._escape(name)}</div>
+              <div class="text-[10px] text-zinc-500 capitalize">${this._escape(channel)}</div>
+            </div>
+          </div>
+          <div class="shrink-0">
+            ${activeBadge}
+          </div>
+        </button>
+      `;
+    }).join('');
+  }
+
+  _getChannelIcon(channel) {
+    const ch = String(channel || '').toLowerCase().trim();
+    switch (ch) {
+      case 'instagram':
+        return `<i class="fa-brands fa-instagram text-pink-500"></i>`;
+      case 'facebook':
+        return `<i class="fa-brands fa-facebook text-blue-500"></i>`;
+      case 'whatsapp':
+        return `<i class="fa-brands fa-whatsapp text-emerald-400"></i>`;
+      case 'telegram':
+        return `<i class="fa-brands fa-telegram text-sky-400"></i>`;
+      case 'webchat':
+        return `<i class="fa-solid fa-comments text-amber-400"></i>`;
+      default:
+        return `<i class="fa-solid fa-circle-nodes text-zinc-400"></i>`;
+    }
   }
 
   renderMessagesCount(count) {
+    const card = document.getElementById('card-metric-messages');
+    const icon = document.getElementById('icon-metric-messages');
+    if (card) card.classList.remove('border-rose-500/30');
+    if (icon) {
+      icon.className = "w-8 h-8 rounded-lg bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-white transition";
+    }
+
     const el = document.getElementById('metric-messages-handled');
+    const elTrend = document.getElementById('metric-messages-trend');
     if (el) {
+      el.className = "text-3xl font-extrabold text-white tracking-tight mb-2";
       el.textContent = typeof count === 'number' ? count.toLocaleString() : count;
+    }
+    if (elTrend) {
+      elTrend.className = "text-emerald-400 font-semibold flex items-center gap-0.5";
+      elTrend.innerHTML = `<i class="fa-solid fa-arrow-trend-up text-[10px]"></i> Live Synced`;
     }
   }
 
   setMessagesCountLoading() {
+    const card = document.getElementById('card-metric-messages');
+    const icon = document.getElementById('icon-metric-messages');
+    if (card) card.classList.remove('border-rose-500/30');
+    if (icon) {
+      icon.className = "w-8 h-8 rounded-lg bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-white transition";
+    }
+
     const el = document.getElementById('metric-messages-handled');
     if (el) {
+      el.className = "text-3xl font-extrabold text-white tracking-tight mb-2";
       el.innerHTML = `
         <span class="inline-flex items-center gap-2">
           <svg class="animate-spin h-6 w-6 text-zinc-400 inline" fill="none" viewBox="0 0 24 24">
@@ -118,6 +369,40 @@ export class DashboardView {
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
         </span>
+      `;
+    }
+    const elTrend = document.getElementById('metric-messages-trend');
+    if (elTrend) {
+      elTrend.className = "text-zinc-500 font-medium flex items-center gap-0.5";
+      elTrend.textContent = "Querying count...";
+    }
+  }
+
+  renderMessagesCountError(errorMessage) {
+    const card = document.getElementById('card-metric-messages');
+    const icon = document.getElementById('icon-metric-messages');
+    if (card) card.classList.add('border-rose-500/30');
+    if (icon) {
+      icon.className = "w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 transition";
+    }
+
+    const elCount = document.getElementById('metric-messages-handled');
+    const elTrend = document.getElementById('metric-messages-trend');
+
+    if (elCount) {
+      elCount.className = "text-2xl font-bold text-rose-400 tracking-tight mb-2 flex items-center gap-2";
+      elCount.innerHTML = `
+        <i class="fa-solid fa-circle-exclamation text-lg"></i>
+        <span>Unavailable</span>
+      `;
+    }
+
+    if (elTrend) {
+      elTrend.className = "text-rose-400 font-medium flex items-center gap-1.5 truncate max-w-[220px]";
+      elTrend.title = errorMessage || 'Server did not respond';
+      elTrend.innerHTML = `
+        <span class="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0 animate-pulse"></span>
+        <span class="truncate text-xs">${this._escape(errorMessage || 'Server did not respond')}</span>
       `;
     }
   }

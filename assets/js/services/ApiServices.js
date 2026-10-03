@@ -59,13 +59,44 @@ export class ApiService {
       throw new Error("clerkId is required to fetch messages count");
     }
     const headers = await this.getHeaders();
-    const response = await fetch(`${CONFIG.API_BASE_URL}/chats/users/${encodeURIComponent(clerkId)}/messages/count`, {
+    const response = await fetch(`${CONFIG.API_BASE_URL}/users/${encodeURIComponent(clerkId)}/messages/count`, {
       method: 'GET',
       headers
     });
 
     if (!response.ok) {
       throw new Error(`Failed to fetch messages count: ${response.statusText}`);
+    }
+    console.log("Receved Messages Number : ",response.json);
+    return await response.json();
+  }
+
+  async fetchUserProfiles(clerkId) {
+    if (!clerkId) {
+      throw new Error("clerkId is required to fetch user profiles");
+    }
+    const headers = await this.getHeaders();
+    const response = await fetch(`${CONFIG.API_BASE_URL}/profiles/user/${encodeURIComponent(clerkId)}`, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      let serverMessage = response.statusText;
+      try {
+        const errorData = await response.json();
+        serverMessage = errorData.message || errorData.error || errorData.detail || JSON.stringify(errorData);
+      } catch (e) {
+        try {
+          const text = await response.text();
+          if (text) serverMessage = text;
+        } catch (_) {}
+      }
+
+      const err = new Error(serverMessage || `Request failed with status ${response.status}`);
+      err.status = response.status;
+      err.serverMessage = serverMessage;
+      throw err;
     }
 
     return await response.json();

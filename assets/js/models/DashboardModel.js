@@ -4,6 +4,7 @@ export class DashboardModel {
   constructor() {
     this.apiService = new ApiService();
     this.cachedRoles = null;
+    this.cachedUserProfiles = null;
 
     this.metrics = {
       activeBots: 3,
@@ -81,28 +82,78 @@ export class DashboardModel {
   }
 
   /**
-   * Fetches total messages handled count for a specific Clerk user
+   * Fetches total messages handled count for a specific Clerk user.
+   * Throws errors if server fails so the view can display an error state.
    */
   async fetchMessagesCount(clerkId) {
     if (!clerkId) {
-      return this.metrics.messagesHandled;
+      const err = new Error("Authentication required");
+      err.serverMessage = "No active Clerk session";
+      throw err;
     }
 
-    try {
-      const data = await this.apiService.fetchUserMessagesCount(clerkId);
-      let count = data.count;
-
-      console.log("data :", data)
-      console.log("count: ", count)
-      if (data && typeof data === 'object') {
-        count = data.count ? data.count : 0;
+    const data = await this.apiService.fetchUserMessagesCount(clerkId);
+    let count = data;
+    if (data && typeof data === 'object') {
+      if (data.count !== undefined) count = data.count;
+      else if (data.total !== undefined) count = data.total;
+      else if (data.messagesCount !== undefined) count = data.messagesCount;
+      else if (data.messages !== undefined) count = data.messages;
+      else if (data.message !== undefined) {
+        const err = new Error(data.message);
+        err.serverMessage = data.message;
+        throw err;
       }
-      const parsed = Number(count);
-      return !isNaN(parsed) ? parsed : this.metrics.messagesHandled;
-    } catch (err) {
-      console.warn("fetchUserMessagesCount failed, falling back to default:", err);
-      return this.metrics.messagesHandled;
     }
+    const parsed = Number(count);
+    if (isNaN(parsed)) {
+      const err = new Error("Invalid count returned from server");
+      throw err;
+    }
+    return parsed;
+  }
+
+  /**
+   * Fetches user profiles from /profiles/user/:clerkId
+   * Computes active count, total count, and operational percentage based on isActive.
+   * Stores the profiles from the first call to prevent redundant requests.
+   * Throws errors if server fails so the view can display an error state.
+   */
+  async fetchUserProfiles(clerkId) {
+    if (!clerkId) {
+      const err = new Error("Authentication required");
+      err.serverMessage = "No active Clerk session";
+      throw err;
+    }
+
+    // Do not call API again if profiles are already stored
+    if (this.cachedUserProfiles) {
+      return this.cachedUserProfiles;
+    }
+
+    const data = await this.apiService.fetchUserProfiles(clerkId);
+    const profilesList = Array.isArray(data)
+      ? data
+      : (data.profiles || data.data);
+
+    if (!Array.isArray(profilesList)) {
+      const msg = data?.message || data?.error || "Received invalid response from profiles server";
+      const err = new Error(msg);
+      err.serverMessage = msg;
+      throw err;
+    }
+
+    const total = profilesList.length;
+    const active = profilesList.filter(p => Boolean(p.isActive)).length;
+    const percentage = total > 0 ? Math.round((active / total) * 100) : 0;
+
+    const result = { total, active, percentage, profiles: profilesList };
+    this.cachedUserProfiles = result; // Stored from the first call
+    return result;
+  }
+
+  getUserProfiles() {
+    return this.cachedUserProfiles?.profiles || [];
   }
 
   /**

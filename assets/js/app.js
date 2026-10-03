@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (document.getElementById('sidebar')) {
     const dashboardModel = new DashboardModel();
     const dashboardView = new DashboardView();
-    const dashboardController = new DashboardController(dashboardModel, dashboardView);
+    const dashboardController = new DashboardController(dashboardModel, dashboardView, authModel);
     dashboardController.init();
   }
 });

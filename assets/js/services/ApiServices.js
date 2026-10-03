@@ -40,6 +40,23 @@ export class ApiService {
     return await response.json();
   }
 
+  async fetchUserMessagesCount(clerkId) {
+    if (!clerkId) {
+      throw new Error("clerkId is required to fetch messages count");
+    }
+    const headers = await this.getHeaders();
+    const response = await fetch(`${CONFIG.API_BASE_URL}/chats/users/${encodeURIComponent(clerkId)}/messages/count`, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch messages count: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
   async fetchRoles() {
     const headers = await this.getHeaders();
     const response = await fetch(`${CONFIG.API_BASE_URL}/users/roles`, {

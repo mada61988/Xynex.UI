@@ -7,7 +7,7 @@ export class DashboardModel {
 
     this.metrics = {
       activeBots: 3,
-      messagesHandled: 48291,
+      messagesHandled: 20040,
       conversionRate: 18.4,
       automatedSales: 142850
     };
@@ -78,6 +78,31 @@ export class DashboardModel {
         resolve(this.metrics);
       }, 300);
     });
+  }
+
+  /**
+   * Fetches total messages handled count for a specific Clerk user
+   */
+  async fetchMessagesCount(clerkId) {
+    if (!clerkId) {
+      return this.metrics.messagesHandled;
+    }
+
+    try {
+      const data = await this.apiService.fetchUserMessagesCount(clerkId);
+      let count = data.count;
+
+      console.log("data :", data)
+      console.log("count: ", count)
+      if (data && typeof data === 'object') {
+        count = data.count ? data.count : 0;
+      }
+      const parsed = Number(count);
+      return !isNaN(parsed) ? parsed : this.metrics.messagesHandled;
+    } catch (err) {
+      console.warn("fetchUserMessagesCount failed, falling back to default:", err);
+      return this.metrics.messagesHandled;
+    }
   }
 
   /**

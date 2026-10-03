@@ -1,7 +1,8 @@
 export class DashboardController {
-  constructor(model, view) {
+  constructor(model, view, authModel = null) {
     this.model = model;
     this.view = view;
+    this.authModel = authModel;
   }
 
   async init() {
@@ -25,6 +26,27 @@ export class DashboardController {
     // 5. Initial metrics payload for overview
     const metrics = await this.model.fetchMetrics();
     this.view.renderMetrics(metrics);
+
+    // 6. Fetch dynamic messages handled count for current Clerk user
+    await this.loadMessagesCount();
+
+    // 7. Re-fetch if auth state updates dynamically
+    if (this.authModel) {
+      this.authModel.onAuthStateChange(({ user }) => {
+        if (user && user.id) {
+          this.loadMessagesCount();
+        }
+      });
+    }
+  }
+
+  async loadMessagesCount() {
+    const clerkId = this.authModel?.user?.id || window.Clerk?.user?.id;
+    if (clerkId) {
+      this.view.setMessagesCountLoading();
+      const count = await this.model.fetchMessagesCount(clerkId);
+      this.view.renderMessagesCount(count);
+    }
   }
 
   async handleNavigation(target) {

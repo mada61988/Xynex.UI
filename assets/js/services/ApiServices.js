@@ -71,12 +71,12 @@ export class ApiService {
     return await response.json();
   }
 
-  async fetchUserProfiles(clerkId) {
+  async fetchUserWorkspaces(clerkId) {
     if (!clerkId) {
-      throw new Error("clerkId is required to fetch user profiles");
+      throw new Error("clerkId is required to fetch user workspaces");
     }
     const headers = await this.getHeaders();
-    const response = await fetch(`${CONFIG.API_BASE_URL}/profiles/user/${encodeURIComponent(clerkId)}`, {
+    const response = await fetch(`${CONFIG.API_BASE_URL}/workspaces/user/${encodeURIComponent(clerkId)}`, {
       method: 'GET',
       headers
     });
@@ -100,6 +100,10 @@ export class ApiService {
     }
 
     return await response.json();
+  }
+
+  async fetchUserProfiles(clerkId) {
+    return this.fetchUserWorkspaces(clerkId);
   }
 
   async fetchRoles() {

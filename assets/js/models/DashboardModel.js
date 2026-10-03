@@ -4,7 +4,7 @@ export class DashboardModel {
   constructor() {
     this.apiService = new ApiService();
     this.cachedRoles = null;
-    this.cachedUserProfiles = null;
+    this.cachedUserWorkspaces = null;
 
     this.metrics = {
       activeBots: 3,
@@ -114,34 +114,35 @@ export class DashboardModel {
   }
 
   /**
-   * Fetches user profiles from /profiles/user/:clerkId
-   * Extracts all channels across all profiles and computes channel metrics.
-   * Stores the profiles from the first call to prevent redundant requests.
+   * Fetches user workspaces from /workspaces/user/:clerkId
+   * Extracts all channels across all workspaces/profiles and computes channel metrics.
+   * Stores the workspaces from the first call to prevent redundant requests.
    * Throws errors if server fails so the view can display an error state.
    */
-  async fetchUserProfiles(clerkId) {
+  async fetchUserWorkspaces(clerkId) {
     if (!clerkId) {
       const err = new Error("Authentication required");
       err.serverMessage = "No active Clerk session";
       throw err;
     }
 
-    // Do not call API again if profiles are already stored
-    if (this.cachedUserProfiles) {
-      return this.cachedUserProfiles;
+    // Do not call API again if workspaces are already stored
+    if (this.cachedUserWorkspaces) {
+      return this.cachedUserWorkspaces;
     }
 
-    const data = await this.apiService.fetchUserProfiles(clerkId);
-    let profilesList = [];
+    const data = await this.apiService.fetchUserWorkspaces(clerkId);
+    let workspacesList = [];
     if (Array.isArray(data)) {
-      profilesList = data;
+      workspacesList = data;
     } else if (data && typeof data === 'object') {
-      if (Array.isArray(data.profiles)) profilesList = data.profiles;
-      else if (Array.isArray(data.data)) profilesList = data.data;
-      else if (data.id !== undefined) profilesList = [data];
+      if (Array.isArray(data.workspaces)) workspacesList = data.workspaces;
+      else if (Array.isArray(data.profiles)) workspacesList = data.profiles;
+      else if (Array.isArray(data.data)) workspacesList = data.data;
+      else if (data.id !== undefined) workspacesList = [data];
     }
 
-    if (!Array.isArray(profilesList) || profilesList.length === 0) {
+    if (!Array.isArray(workspacesList) || workspacesList.length === 0) {
       if (data && (data.message || data.error)) {
         const msg = data.message || data.error;
         const err = new Error(msg);
@@ -150,8 +151,8 @@ export class DashboardModel {
       }
     }
 
-    // Collect all channels across all profiles
-    const allChannels = profilesList.flatMap(p => Array.isArray(p.channels) ? p.channels : []);
+    // Collect all channels across all workspaces/profiles
+    const allChannels = workspacesList.flatMap(p => Array.isArray(p.channels) ? p.channels : []);
     const totalChannels = allChannels.length;
     const activeChannels = allChannels.filter(c => Boolean(c.isActive)).length;
     const percentageOperational = totalChannels > 0 ? Math.round((activeChannels / totalChannels) * 100) : 0;
@@ -161,15 +162,24 @@ export class DashboardModel {
       activeChannels,
       percentageOperational,
       channels: allChannels,
-      profiles: profilesList
+      profiles: workspacesList,
+      workspaces: workspacesList
     };
 
-    this.cachedUserProfiles = result; // Stored from the first call
+    this.cachedUserWorkspaces = result; // Stored from the first call
     return result;
   }
 
+  async fetchUserProfiles(clerkId) {
+    return this.fetchUserWorkspaces(clerkId);
+  }
+
+  getUserWorkspaces() {
+    return this.cachedUserWorkspaces?.workspaces || [];
+  }
+
   getUserProfiles() {
-    return this.cachedUserProfiles?.profiles || [];
+    return this.getUserWorkspaces();
   }
 
   /**

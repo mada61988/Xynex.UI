@@ -102,8 +102,8 @@ export class DashboardController {
 
     this.view.setChannelsLoading();
     try {
-      // Calls fetchUserProfiles once and stores the profiles to avoid redundant API requests
-      const data = await this.model.fetchUserProfiles(clerkId);
+      // Calls fetchUserWorkspaces once and stores the workspaces to avoid redundant API requests
+      const data = await this.model.fetchUserWorkspaces(clerkId);
       
       // Render overall channels metric (total channels across all profiles)
       this.view.renderChannelsMetric({
@@ -113,7 +113,7 @@ export class DashboardController {
       });
 
       // Render workspaces dropdown and handle workspace selection
-      this.view.renderWorkspacesDropdown(data.profiles || [], null, (selectedId) => {
+      this.view.renderWorkspacesDropdown(data.workspaces || data.profiles || [], null, (selectedId) => {
         if (selectedId === 'all') {
           this.view.renderChannelsMetric({
             totalChannels: data.totalChannels,
@@ -121,7 +121,7 @@ export class DashboardController {
             percentageOperational: data.percentageOperational
           });
         } else {
-          const profile = (data.profiles || []).find(p => p.id === Number(selectedId) || p.id === selectedId);
+          const profile = (data.workspaces || data.profiles || []).find(p => p.id === Number(selectedId) || p.id === selectedId);
           if (profile) {
             const chs = Array.isArray(profile.channels) ? profile.channels : [];
             const total = chs.length;
@@ -136,7 +136,7 @@ export class DashboardController {
         }
       });
     } catch (err) {
-      console.error("DashboardController: Error loading profiles metric:", err);
+      console.error("DashboardController: Error loading workspaces & channels metric:", err);
       const serverMessage = err.serverMessage || err.message || "Server did not respond";
       this.view.renderChannelsError(serverMessage);
       this.view.renderWorkspacesDropdown([], serverMessage);

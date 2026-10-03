@@ -59,6 +59,12 @@ export class DashboardController {
         this.view.renderUsersTable(users);
       } catch (err) {
         console.error("DashboardController: Error fetching users:", err);
+        const serverMessage = err.serverMessage || err.message || "Failed to communicate with server.";
+        const status = err.status || (String(serverMessage).toLowerCase().includes('unauthorized') ? 401 : 403);
+        this.view.renderUsersError({
+          status: status,
+          message: serverMessage
+        }, () => this.handleNavigation('users'));
       }
     } else {
       // Default to overview section

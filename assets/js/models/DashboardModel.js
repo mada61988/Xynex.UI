@@ -106,20 +106,20 @@ export class DashboardModel {
   }
 
   /**
-   * Fetches users from the fetchUsers api service, with fallback
+   * Fetches users from the fetchUsers api service.
+   * Throws errors so the view can display the exact server error card.
    */
   async fetchUsers() {
-    try {
-      const data = await this.apiService.fetchUsers();
-      if (Array.isArray(data)) {
-        this.currentUsers = data;
-        return data;
-      }
-      return this.fallbackUsers;
-    } catch (err) {
-      console.warn("ApiService.fetchUsers failed, using fallback dataset:", err);
-      return this.fallbackUsers;
+    const data = await this.apiService.fetchUsers();
+    if (Array.isArray(data)) {
+      this.currentUsers = data;
+      return data;
     }
+
+    const msg = data?.message || data?.error || "Received invalid response from server";
+    const err = new Error(msg);
+    err.serverMessage = msg;
+    throw err;
   }
 
   /**

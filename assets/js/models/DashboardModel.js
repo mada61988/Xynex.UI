@@ -179,6 +179,53 @@ export class DashboardModel {
   }
 
   /**
+   * Fetches DM to Checkout conversion rate for all workspaces or a specific workspace.
+   * Reads { channelDmToCheckout } and returns the percentage value.
+   */
+  async fetchDmToCheckout({ clerkId, workspaceId = null }) {
+    let data;
+    if (workspaceId && workspaceId !== 'all') {
+      data = await this.apiService.fetchWorkspaceDmToCheckout(workspaceId);
+    } else {
+      if (!clerkId) {
+        const err = new Error("Authentication required");
+        err.serverMessage = "No active Clerk session";
+        throw err;
+      }
+      data = await this.apiService.fetchUserDmToCheckout(clerkId);
+    }
+
+    let rawVal = 0;
+    if (typeof data === 'number') {
+      rawVal = data;
+    } else if (data && typeof data === 'object') {
+      if (data.channelDmToCheckout !== undefined) {
+        rawVal = data.channelDmToCheckout;
+      } else if (data.dmToCheckout !== undefined) {
+        rawVal = data.dmToCheckout;
+      } else if (data.conversionRate !== undefined) {
+        rawVal = data.conversionRate;
+      } else if (data.rate !== undefined) {
+        rawVal = data.rate;
+      } else if (data.message !== undefined && typeof data.message === 'string') {
+        const err = new Error(data.message);
+        err.serverMessage = data.message;
+        throw err;
+      }
+    }
+
+    const num = Number(rawVal);
+    if (isNaN(num)) {
+      const err = new Error("Invalid conversion rate returned from server");
+      throw err;
+    }
+
+    // Convert decimal ratio (e.g. 0.65) to percentage (65%)
+    const percentage = num <= 1 && num > 0 ? num * 100 : num;
+    return Number(percentage.toFixed(2));
+  }
+
+  /**
    * Fetches user workspaces from /workspaces/user/:clerkId
    * Extracts all channels across all workspaces/profiles and computes channel metrics.
    * Stores the workspaces from the first call to prevent redundant requests.

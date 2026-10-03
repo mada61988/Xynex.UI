@@ -276,19 +276,19 @@
         </div>
 
         <!-- Metric Card 3: Conversion Rate -->
-        <div class="bento-card rounded-2xl p-6 relative overflow-hidden group">
+        <div id="card-metric-conversion" class="bento-card rounded-2xl p-6 relative overflow-hidden group transition duration-300">
           <div class="flex items-center justify-between text-zinc-400 mb-4">
             <span class="text-xs font-semibold uppercase tracking-wider">DM-to-Checkout</span>
-            <div class="w-8 h-8 rounded-lg bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-white">
+            <div id="icon-metric-conversion" class="w-8 h-8 rounded-lg bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-white transition">
               <i class="fa-solid fa-bag-shopping text-xs"></i>
             </div>
           </div>
-          <div class="text-3xl font-extrabold text-white tracking-tight mb-2">18.4%</div>
+          <div id="metric-conversion-rate" class="text-3xl font-extrabold text-white tracking-tight mb-2">—</div>
           <div class="flex items-center gap-2 text-xs">
-            <span class="text-emerald-400 font-semibold flex items-center gap-0.5">
-              <i class="fa-solid fa-arrow-trend-up text-[10px]"></i> +3.2%
+            <span id="metric-conversion-trend" class="text-zinc-500 font-medium flex items-center gap-1">
+              Syncing rate...
             </span>
-            <span class="text-zinc-500">vs standard 2.1%</span>
+            <span id="metric-conversion-subtext" class="text-zinc-600">· API query</span>
           </div>
         </div>
 

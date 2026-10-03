@@ -39,12 +39,16 @@ export class DashboardController {
     // 7. Fetch dynamic workspaces and channels metric for current Clerk user
     await this.loadProfilesMetric();
 
-    // 8. Re-fetch if auth state updates dynamically
+    // 8. Fetch dynamic DM to Checkout rate for current Clerk user
+    await this.loadDmToCheckout();
+
+    // 9. Re-fetch if auth state updates dynamically
     if (this.authModel) {
       this.authModel.onAuthStateChange(({ user }) => {
         if (user && user.id) {
           this.loadMessagesCount();
           this.loadProfilesMetric();
+          this.loadDmToCheckout();
         }
       });
     }
@@ -169,13 +173,16 @@ export class DashboardController {
           });
         }
 
-        // 2. Fetch overall user messages count
-        await this.loadMessagesCount();
+        // 2. Fetch overall user messages count & overall DM-to-checkout rate
+        await Promise.allSettled([
+          this.loadMessagesCount(),
+          this.loadDmToCheckout('all')
+        ]);
         return;
       }
 
       // A specific workspace is chosen:
-      // Concurrently fetch channels and messages until all data is retrieved
+      // Concurrently fetch channels, messages, and DM-to-checkout rate for that workspace
       await Promise.allSettled([
         (async () => {
           this.view.setChannelsLoading();
@@ -190,11 +197,32 @@ export class DashboardController {
         })(),
         (async () => {
           await this.loadWorkspaceMessagesCount(selectedId);
+        })(),
+        (async () => {
+          await this.loadDmToCheckout(selectedId);
         })()
       ]);
     } finally {
       // Hide the centered loading spinner once all data is fetched
       this.view.hidePageLoading();
+    }
+  }
+
+  async loadDmToCheckout(workspaceId = null) {
+    const clerkId = this.authModel?.user?.id || window.Clerk?.user?.id;
+    if (!clerkId && (!workspaceId || workspaceId === 'all')) {
+      this.view.renderDmToCheckoutError("Authentication required");
+      return;
+    }
+
+    this.view.setDmToCheckoutLoading();
+    try {
+      const percentage = await this.model.fetchDmToCheckout({ clerkId, workspaceId });
+      this.view.renderDmToCheckout(percentage);
+    } catch (err) {
+      console.error("DashboardController: Error loading DM to checkout rate:", err);
+      const serverMessage = err.serverMessage || err.message || "Server did not respond";
+      this.view.renderDmToCheckoutError(serverMessage);
     }
   }
 

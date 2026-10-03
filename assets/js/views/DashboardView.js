@@ -392,8 +392,17 @@ export class DashboardView {
       el.textContent = typeof count === 'number' ? count.toLocaleString() : count;
     }
     if (elTrend) {
-      elTrend.className = "text-emerald-400 font-semibold flex items-center gap-0.5";
+      elTrend.className = "text-emerald-400 font-semibold flex items-center gap-1";
       elTrend.innerHTML = `<i class="fa-solid fa-arrow-trend-up text-[10px]"></i> Live Synced`;
+    }
+  }
+
+  updateMessagesLastSynced(seconds) {
+    const elSynced = document.getElementById('metric-messages-last-synced');
+    if (elSynced) {
+      const sec = Math.max(0, Number(seconds) || 0);
+      const unit = sec === 1 ? 'second' : 'seconds';
+      elSynced.textContent = `· last synced ${sec} ${unit}`;
     }
   }
 
@@ -422,6 +431,10 @@ export class DashboardView {
       elTrend.className = "text-zinc-500 font-medium flex items-center gap-0.5";
       elTrend.textContent = "Querying count...";
     }
+    const elSynced = document.getElementById('metric-messages-last-synced');
+    if (elSynced) {
+      elSynced.textContent = '';
+    }
   }
 
   renderMessagesCountError(errorMessage) {
@@ -434,6 +447,7 @@ export class DashboardView {
 
     const elCount = document.getElementById('metric-messages-handled');
     const elTrend = document.getElementById('metric-messages-trend');
+    const elSynced = document.getElementById('metric-messages-last-synced');
 
     if (elCount) {
       elCount.className = "text-2xl font-bold text-rose-400 tracking-tight mb-2 flex items-center gap-2";
@@ -450,6 +464,10 @@ export class DashboardView {
         <span class="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0 animate-pulse"></span>
         <span class="truncate text-xs">${this._escape(errorMessage || 'Server did not respond')}</span>
       `;
+    }
+
+    if (elSynced) {
+      elSynced.textContent = '';
     }
   }
 

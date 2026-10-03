@@ -42,15 +42,14 @@
     <div>
       <!-- Brand & Status -->
       <div class="flex items-center justify-between pb-6 border-b border-zinc-800">
-        <a href="index.html" class="flex items-center gap-2.5 group">
-          <div class="w-6 h-6 bg-white rounded-md flex items-center justify-center transition-colors">
-            <div class="w-2.5 h-2.5 bg-black rounded-full animate-pulse"></div>
+        <a href="index.html" class="flex flex-col group">
+          <div class="flex items-center gap-2.5">
+            <div class="w-6 h-6 bg-white rounded-md flex items-center justify-center transition-colors shrink-0">
+              <div class="w-2.5 h-2.5 bg-black rounded-full animate-pulse"></div>
+            </div>
+            <span class="font-bold text-lg tracking-tight text-white leading-tight">Xynex</span>
           </div>
-          <div>
-            <div class="font-bold text-lg tracking-tight text-white leading-tight">Xynex</div>
-            
-          </div>
-          <div class="text-[10px] text-zinc-400 font-medium">Dashboard</div>
+          <div class="text-[10px] text-zinc-400 font-medium tracking-wide mt-1">Dashboard</div>
         </a>
 
         <!-- Mobile close button -->
@@ -212,10 +211,10 @@
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-            Command Center
+            Dashboard Engine
           </h1>
           <p class="text-xs sm:text-sm text-zinc-400 mt-1">
-            Real-time telemetry and conversation analytics for Instagram automated sales.
+            Real-time telemetry and conversation analytics for automated sales.
           </p>
         </div>
 
@@ -256,10 +255,11 @@
             </div>
           </div>
           <div id="metric-messages-handled" class="text-3xl font-extrabold text-white tracking-tight mb-2">—</div>
-          <div class="flex items-center gap-2 text-xs">
-            <span id="metric-messages-trend" class="text-zinc-500 font-medium flex items-center gap-0.5">
+          <div class="flex items-center gap-1.5 text-xs flex-wrap">
+            <span id="metric-messages-trend" class="text-zinc-500 font-medium flex items-center gap-1">
               Syncing count...
             </span>
+            <span id="metric-messages-last-synced" class="text-zinc-500 font-mono text-[11px]"></span>
           </div>
         </div>
 

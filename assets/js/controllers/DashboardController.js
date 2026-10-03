@@ -3,6 +3,9 @@ export class DashboardController {
     this.model = model;
     this.view = view;
     this.authModel = authModel;
+    this.messagesPollInterval = null;
+    this.messagesTickerInterval = null;
+    this.lastMessagesSyncedTime = null;
   }
 
   async init() {
@@ -27,8 +30,9 @@ export class DashboardController {
     const metrics = await this.model.fetchMetrics();
     this.view.renderMetrics(metrics);
 
-    // 6. Fetch dynamic messages handled count for current Clerk user
+    // 6. Fetch dynamic messages handled count for current Clerk user and start polling
     await this.loadMessagesCount();
+    this.startMessagesPolling();
 
     // 7. Fetch dynamic profiles metric for current Clerk user
     await this.loadProfilesMetric();
@@ -44,21 +48,47 @@ export class DashboardController {
     }
   }
 
-  async loadMessagesCount() {
+  startMessagesPolling() {
+    // 1-second ticker to update "last synced X seconds"
+    if (!this.messagesTickerInterval) {
+      this.messagesTickerInterval = setInterval(() => {
+        if (this.lastMessagesSyncedTime) {
+          const elapsed = Math.floor((Date.now() - this.lastMessagesSyncedTime) / 1000);
+          this.view.updateMessagesLastSynced(elapsed);
+        }
+      }, 1000);
+    }
+
+    // 2-minute polling interval (120,000 ms)
+    if (!this.messagesPollInterval) {
+      this.messagesPollInterval = setInterval(async () => {
+        await this.loadMessagesCount(true);
+      }, 120000);
+    }
+  }
+
+  async loadMessagesCount(isBackground = false) {
     const clerkId = this.authModel?.user?.id || window.Clerk?.user?.id;
     if (!clerkId) {
       this.view.renderMessagesCountError("Authentication required");
       return;
     }
 
-    this.view.setMessagesCountLoading();
+    if (!isBackground) {
+      this.view.setMessagesCountLoading();
+    }
+
     try {
       const count = await this.model.fetchMessagesCount(clerkId);
       this.view.renderMessagesCount(count);
+      this.lastMessagesSyncedTime = Date.now();
+      this.view.updateMessagesLastSynced(0);
     } catch (err) {
       console.error("DashboardController: Error loading messages count:", err);
       const serverMessage = err.serverMessage || err.message || "Server did not respond";
-      this.view.renderMessagesCountError(serverMessage);
+      if (!isBackground) {
+        this.view.renderMessagesCountError(serverMessage);
+      }
     }
   }
 

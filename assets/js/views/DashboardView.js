@@ -11,56 +11,58 @@ export class DashboardView {
     this.usersTableContainer = document.getElementById('users-table-container');
     this.usersCountBadge = document.getElementById('users-count-badge');
 
-    // Channels dropdown elements
-    this.channelsWrapper = document.getElementById('channels-dropdown-wrapper');
-    this.channelsBtn = document.getElementById('channels-dropdown-btn');
-    this.channelsMenu = document.getElementById('channels-dropdown-menu');
-    this.channelsList = document.getElementById('channels-dropdown-list');
-    this.selectedChannelIcon = document.getElementById('selected-channel-icon');
-    this.selectedChannelName = document.getElementById('selected-channel-name');
-    this.selectedProfileId = null;
+    // Workspaces dropdown elements
+    this.workspacesWrapper = document.getElementById('workspaces-dropdown-wrapper') || document.getElementById('channels-dropdown-wrapper');
+    this.workspacesBtn = document.getElementById('workspaces-dropdown-btn') || document.getElementById('channels-dropdown-btn');
+    this.workspacesMenu = document.getElementById('workspaces-dropdown-menu') || document.getElementById('channels-dropdown-menu');
+    this.workspacesList = document.getElementById('workspaces-dropdown-list') || document.getElementById('channels-dropdown-list');
+    this.selectedWorkspaceIcon = document.getElementById('selected-workspace-icon') || document.getElementById('selected-channel-icon');
+    this.selectedWorkspaceName = document.getElementById('selected-workspace-name') || document.getElementById('selected-channel-name');
+    this.selectedWorkspaceId = 'all';
+    this.onWorkspaceSelectCallback = null;
 
     // Callbacks for role editing
     this.onEditRoleClick = null;
     this.onSaveRoleClick = null;
 
-    this._bindChannelsDropdownEvents();
+    this._bindWorkspacesDropdownEvents();
   }
 
-  _bindChannelsDropdownEvents() {
-    if (this.channelsBtn && this.channelsMenu) {
-      this.channelsBtn.addEventListener('click', (e) => {
+  _bindWorkspacesDropdownEvents() {
+    if (this.workspacesBtn && this.workspacesMenu) {
+      this.workspacesBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.channelsMenu.classList.toggle('hidden');
+        this.workspacesMenu.classList.toggle('hidden');
       });
 
       document.addEventListener('click', (e) => {
-        if (this.channelsWrapper && !this.channelsWrapper.contains(e.target)) {
-          this.channelsMenu.classList.add('hidden');
+        if (this.workspacesWrapper && !this.workspacesWrapper.contains(e.target)) {
+          this.workspacesMenu.classList.add('hidden');
         }
       });
     }
 
-    if (this.channelsList) {
-      this.channelsList.addEventListener('click', (e) => {
-        const item = e.target.closest('.channel-item');
+    if (this.workspacesList) {
+      this.workspacesList.addEventListener('click', (e) => {
+        const item = e.target.closest('.workspace-item');
         if (item) {
-          const profileId = Number(item.dataset.profileId) || item.dataset.profileId;
-          const channel = item.dataset.channel;
+          const workspaceId = item.dataset.workspaceId === 'all' ? 'all' : (Number(item.dataset.workspaceId) || item.dataset.workspaceId);
           const name = item.dataset.name;
 
-          this.selectedProfileId = profileId;
-          if (this.selectedChannelIcon) {
-            this.selectedChannelIcon.innerHTML = this._getChannelIcon(channel);
+          this.selectedWorkspaceId = workspaceId;
+          if (this.selectedWorkspaceIcon) {
+            this.selectedWorkspaceIcon.innerHTML = workspaceId === 'all'
+              ? `<i class="fa-solid fa-layer-group text-zinc-300"></i>`
+              : `<i class="fa-solid fa-briefcase text-zinc-300"></i>`;
           }
-          if (this.selectedChannelName) {
-            this.selectedChannelName.textContent = name;
+          if (this.selectedWorkspaceName) {
+            this.selectedWorkspaceName.textContent = name;
           }
-          if (this.channelsMenu) {
-            this.channelsMenu.classList.add('hidden');
+          if (this.workspacesMenu) {
+            this.workspacesMenu.classList.add('hidden');
           }
 
-          this.channelsList.querySelectorAll('.channel-item').forEach(btn => {
+          this.workspacesList.querySelectorAll('.workspace-item').forEach(btn => {
             if (btn === item) {
               btn.classList.add('bg-zinc-800/90', 'text-white', 'font-semibold');
               btn.classList.remove('text-zinc-300');
@@ -69,6 +71,10 @@ export class DashboardView {
               btn.classList.add('text-zinc-300');
             }
           });
+
+          if (this.onWorkspaceSelectCallback) {
+            this.onWorkspaceSelectCallback(workspaceId);
+          }
         }
       });
     }
@@ -156,15 +162,15 @@ export class DashboardView {
     console.log("DashboardView: Telemetry ready.");
   }
 
-  setProfilesLoading() {
-    const card = document.getElementById('card-metric-profiles');
-    const icon = document.getElementById('icon-metric-profiles');
+  setChannelsLoading() {
+    const card = document.getElementById('card-metric-channels') || document.getElementById('card-metric-profiles');
+    const icon = document.getElementById('icon-metric-channels') || document.getElementById('icon-metric-profiles');
     if (card) card.classList.remove('border-rose-500/30');
     if (icon) {
       icon.className = "w-8 h-8 rounded-lg bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-white transition";
     }
 
-    const elCount = document.getElementById('metric-profiles-count');
+    const elCount = document.getElementById('metric-channels-count') || document.getElementById('metric-profiles-count');
     if (elCount) {
       elCount.className = "text-3xl font-extrabold text-white tracking-tight mb-2";
       elCount.innerHTML = `
@@ -177,32 +183,39 @@ export class DashboardView {
       `;
     }
 
-    const elPercentage = document.getElementById('metric-profiles-percentage');
+    const elPercentage = document.getElementById('metric-channels-percentage') || document.getElementById('metric-profiles-percentage');
     if (elPercentage) {
       elPercentage.className = "text-zinc-500 font-medium flex items-center gap-1";
       elPercentage.textContent = "Connecting to API...";
     }
   }
 
-  renderProfilesMetric({ total, active, percentage }) {
-    const card = document.getElementById('card-metric-profiles');
-    const icon = document.getElementById('icon-metric-profiles');
+  setProfilesLoading() {
+    this.setChannelsLoading();
+  }
+
+  renderChannelsMetric({ totalChannels, activeChannels, percentageOperational, total, active, percentage }) {
+    const card = document.getElementById('card-metric-channels') || document.getElementById('card-metric-profiles');
+    const icon = document.getElementById('icon-metric-channels') || document.getElementById('icon-metric-profiles');
     if (card) card.classList.remove('border-rose-500/30');
     if (icon) {
       icon.className = "w-8 h-8 rounded-lg bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-white transition";
     }
 
-    const elCount = document.getElementById('metric-profiles-count');
-    const elPercentage = document.getElementById('metric-profiles-percentage');
-    const elSubtext = document.getElementById('metric-profiles-subtext');
+    const elCount = document.getElementById('metric-channels-count') || document.getElementById('metric-profiles-count');
+    const elPercentage = document.getElementById('metric-channels-percentage') || document.getElementById('metric-profiles-percentage');
+    const elSubtext = document.getElementById('metric-channels-subtext') || document.getElementById('metric-profiles-subtext');
+
+    const tot = totalChannels !== undefined ? totalChannels : (total ?? 0);
+    const act = activeChannels !== undefined ? activeChannels : (active ?? 0);
+    const pct = percentageOperational !== undefined ? percentageOperational : (percentage ?? (tot > 0 ? Math.round((act / tot) * 100) : 0));
 
     if (elCount) {
       elCount.className = "text-3xl font-extrabold text-white tracking-tight mb-2";
-      elCount.textContent = `${total} / ${active}`;
+      elCount.textContent = `${tot} / ${act}`;
     }
 
     if (elPercentage) {
-      const pct = Math.round(Number(percentage) || 0);
       elPercentage.innerHTML = `
         <i class="fa-solid fa-circle-check text-[10px]"></i> ${pct}% Operational
       `;
@@ -214,21 +227,25 @@ export class DashboardView {
     }
 
     if (elSubtext) {
-      elSubtext.textContent = `· ${active} Active of ${total}`;
+      elSubtext.textContent = `· ${act} Active of ${tot}`;
     }
   }
 
-  renderProfilesError(errorMessage) {
-    const card = document.getElementById('card-metric-profiles');
-    const icon = document.getElementById('icon-metric-profiles');
+  renderProfilesMetric(args) {
+    this.renderChannelsMetric(args);
+  }
+
+  renderChannelsError(errorMessage) {
+    const card = document.getElementById('card-metric-channels') || document.getElementById('card-metric-profiles');
+    const icon = document.getElementById('icon-metric-channels') || document.getElementById('icon-metric-profiles');
     if (card) card.classList.add('border-rose-500/30');
     if (icon) {
       icon.className = "w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 transition";
     }
 
-    const elCount = document.getElementById('metric-profiles-count');
-    const elPercentage = document.getElementById('metric-profiles-percentage');
-    const elSubtext = document.getElementById('metric-profiles-subtext');
+    const elCount = document.getElementById('metric-channels-count') || document.getElementById('metric-profiles-count');
+    const elPercentage = document.getElementById('metric-channels-percentage') || document.getElementById('metric-profiles-percentage');
+    const elSubtext = document.getElementById('metric-channels-subtext') || document.getElementById('metric-profiles-subtext');
 
     if (elCount) {
       elCount.className = "text-2xl font-bold text-rose-400 tracking-tight mb-2 flex items-center gap-2";
@@ -252,66 +269,71 @@ export class DashboardView {
     }
   }
 
-  renderChannelsDropdown(profiles, errorMessage = null) {
-    if (!this.channelsList || !this.selectedChannelName) return;
+  renderProfilesError(errorMessage) {
+    this.renderChannelsError(errorMessage);
+  }
+
+  renderWorkspacesDropdown(profiles, errorMessage = null, onSelect = null) {
+    if (onSelect) {
+      this.onWorkspaceSelectCallback = onSelect;
+    }
+
+    if (!this.workspacesList || !this.selectedWorkspaceName) return;
 
     if (errorMessage || !profiles || profiles.length === 0) {
-      if (this.selectedChannelIcon) {
-        this.selectedChannelIcon.innerHTML = `<i class="fa-solid fa-circle-nodes text-zinc-500"></i>`;
+      if (this.selectedWorkspaceIcon) {
+        this.selectedWorkspaceIcon.innerHTML = `<i class="fa-solid fa-layer-group text-zinc-500"></i>`;
       }
-      this.selectedChannelName.textContent = errorMessage ? 'Channels Error' : 'No Channels';
-      this.channelsList.innerHTML = `
+      this.selectedWorkspaceName.textContent = errorMessage ? 'Workspace Error' : 'No Workspaces';
+      this.workspacesList.innerHTML = `
         <div class="px-3 py-2 text-xs text-zinc-500 text-center">
-          ${this._escape(errorMessage || 'No channels available')}
+          ${this._escape(errorMessage || 'No workspaces available')}
         </div>
       `;
       return;
     }
 
-    // Default to 'all' if not set or if 'all' is selected
-    if (!this.selectedProfileId) {
-      this.selectedProfileId = 'all';
+    if (!this.selectedWorkspaceId) {
+      this.selectedWorkspaceId = 'all';
     }
 
-    const isAllSelected = this.selectedProfileId === 'all';
+    const isAllSelected = this.selectedWorkspaceId === 'all';
     let selectedProfile = null;
 
     if (isAllSelected) {
-      if (this.selectedChannelIcon) {
-        this.selectedChannelIcon.innerHTML = this._getChannelIcon('all');
+      if (this.selectedWorkspaceIcon) {
+        this.selectedWorkspaceIcon.innerHTML = `<i class="fa-solid fa-layer-group text-zinc-300"></i>`;
       }
-      this.selectedChannelName.textContent = 'All Channels';
+      this.selectedWorkspaceName.textContent = 'All Workspaces';
     } else {
-      selectedProfile = profiles.find(p => p.id === this.selectedProfileId);
+      selectedProfile = profiles.find(p => p.id === this.selectedWorkspaceId);
       if (selectedProfile) {
-        const name = selectedProfile.username || selectedProfile.name || selectedProfile.handle || selectedProfile.title || `Profile #${selectedProfile.id}`;
-        if (this.selectedChannelIcon) {
-          this.selectedChannelIcon.innerHTML = this._getChannelIcon(selectedProfile.channel || selectedProfile.chanell);
+        if (this.selectedWorkspaceIcon) {
+          this.selectedWorkspaceIcon.innerHTML = `<i class="fa-solid fa-briefcase text-zinc-300"></i>`;
         }
-        this.selectedChannelName.textContent = name;
+        this.selectedWorkspaceName.textContent = selectedProfile.name || `Profile #${selectedProfile.id}`;
       } else {
-        this.selectedProfileId = 'all';
-        if (this.selectedChannelIcon) {
-          this.selectedChannelIcon.innerHTML = this._getChannelIcon('all');
+        this.selectedWorkspaceId = 'all';
+        if (this.selectedWorkspaceIcon) {
+          this.selectedWorkspaceIcon.innerHTML = `<i class="fa-solid fa-layer-group text-zinc-300"></i>`;
         }
-        this.selectedChannelName.textContent = 'All Channels';
+        this.selectedWorkspaceName.textContent = 'All Workspaces';
       }
     }
 
-    // 1. "All Channels" option at the top of the list
+    // 1. "All Workspaces" option at the top of the list
     const allOptionHtml = `
       <button 
         type="button" 
-        class="channel-item w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs hover:bg-zinc-800/70 transition text-left cursor-pointer ${isAllSelected ? 'bg-zinc-800/90 text-white font-semibold' : 'text-zinc-300'}"
-        data-profile-id="all"
-        data-channel="all"
-        data-name="All Channels"
+        class="workspace-item w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs hover:bg-zinc-800/70 transition text-left cursor-pointer ${isAllSelected ? 'bg-zinc-800/90 text-white font-semibold' : 'text-zinc-300'}"
+        data-workspace-id="all"
+        data-name="All Workspaces"
       >
         <div class="flex items-center gap-2.5 min-w-0 pr-2">
-          <span class="text-sm shrink-0">${this._getChannelIcon('all')}</span>
+          <span class="text-sm shrink-0"><i class="fa-solid fa-layer-group text-zinc-300"></i></span>
           <div class="truncate">
-            <div class="truncate text-white font-medium">All Channels</div>
-            <div class="text-[10px] text-zinc-500">Overall channels</div>
+            <div class="truncate text-white font-medium">All Workspaces</div>
+            <div class="text-[10px] text-zinc-500">Overall profiles view</div>
           </div>
         </div>
         <div class="shrink-0">
@@ -323,38 +345,43 @@ export class DashboardView {
       <div class="border-t border-zinc-800/80 my-1"></div>
     `;
 
-    // 2. Individual channel profile options
+    // 2. Individual profile workspace options
     const profilesHtml = profiles.map(p => {
-      const name = p.username || p.name || p.handle || p.title || `Profile #${p.id}`;
-      const channel = p.channel || p.chanell || 'unknown';
-      const isSelected = p.id === this.selectedProfileId;
-      const activeBadge = p.isActive 
-        ? `<span class="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20"><span class="w-1 h-1 rounded-full bg-emerald-400"></span>Active</span>`
-        : `<span class="text-[10px] text-zinc-500 bg-zinc-800/80 px-1.5 py-0.5 rounded border border-zinc-700/60">Offline</span>`;
+      const name = p.name || `Profile #${p.id}`;
+      const isSelected = p.id === this.selectedWorkspaceId;
+      const isActiveStatus = String(p.status || '').toLowerCase() === 'active';
+      const statusBadge = isActiveStatus
+        ? `<span class="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 font-semibold"><span class="w-1 h-1 rounded-full bg-emerald-400 animate-pulse"></span>Active</span>`
+        : `<span class="inline-flex items-center gap-1 text-[10px] text-zinc-500 bg-zinc-800/80 px-1.5 py-0.5 rounded border border-zinc-700/60"><span class="w-1 h-1 rounded-full bg-zinc-500"></span>Offline</span>`;
+
+      const channelCount = Array.isArray(p.channels) ? p.channels.length : 0;
 
       return `
         <button 
           type="button" 
-          class="channel-item w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs hover:bg-zinc-800/70 transition text-left cursor-pointer ${isSelected ? 'bg-zinc-800/90 text-white font-semibold' : 'text-zinc-300'}"
-          data-profile-id="${p.id}"
-          data-channel="${this._escape(channel)}"
+          class="workspace-item w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs hover:bg-zinc-800/70 transition text-left cursor-pointer ${isSelected ? 'bg-zinc-800/90 text-white font-semibold' : 'text-zinc-300'}"
+          data-workspace-id="${p.id}"
           data-name="${this._escape(name)}"
         >
           <div class="flex items-center gap-2.5 min-w-0 pr-2">
-            <span class="text-sm shrink-0">${this._getChannelIcon(channel)}</span>
+            <span class="text-sm shrink-0"><i class="fa-solid fa-briefcase text-zinc-400"></i></span>
             <div class="truncate">
               <div class="truncate text-white font-medium">${this._escape(name)}</div>
-              <div class="text-[10px] text-zinc-500 capitalize">${this._escape(channel)}</div>
+              <div class="text-[10px] text-zinc-500">${channelCount} ${channelCount === 1 ? 'Channel' : 'Channels'}</div>
             </div>
           </div>
           <div class="shrink-0">
-            ${activeBadge}
+            ${statusBadge}
           </div>
         </button>
       `;
     }).join('');
 
-    this.channelsList.innerHTML = allOptionHtml + profilesHtml;
+    this.workspacesList.innerHTML = allOptionHtml + profilesHtml;
+  }
+
+  renderChannelsDropdown(profiles, errorMessage = null) {
+    this.renderWorkspacesDropdown(profiles, errorMessage);
   }
 
   _getChannelIcon(channel) {

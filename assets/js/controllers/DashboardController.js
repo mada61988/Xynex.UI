@@ -95,22 +95,51 @@ export class DashboardController {
   async loadProfilesMetric() {
     const clerkId = this.authModel?.user?.id || window.Clerk?.user?.id;
     if (!clerkId) {
-      this.view.renderProfilesError("Authentication required");
-      this.view.renderChannelsDropdown([], "Authentication required");
+      this.view.renderChannelsError("Authentication required");
+      this.view.renderWorkspacesDropdown([], "Authentication required");
       return;
     }
 
-    this.view.setProfilesLoading();
+    this.view.setChannelsLoading();
     try {
       // Calls fetchUserProfiles once and stores the profiles to avoid redundant API requests
-      const profilesData = await this.model.fetchUserProfiles(clerkId);
-      this.view.renderProfilesMetric(profilesData);
-      this.view.renderChannelsDropdown(profilesData.profiles || []);
+      const data = await this.model.fetchUserProfiles(clerkId);
+      
+      // Render overall channels metric (total channels across all profiles)
+      this.view.renderChannelsMetric({
+        totalChannels: data.totalChannels,
+        activeChannels: data.activeChannels,
+        percentageOperational: data.percentageOperational
+      });
+
+      // Render workspaces dropdown and handle workspace selection
+      this.view.renderWorkspacesDropdown(data.profiles || [], null, (selectedId) => {
+        if (selectedId === 'all') {
+          this.view.renderChannelsMetric({
+            totalChannels: data.totalChannels,
+            activeChannels: data.activeChannels,
+            percentageOperational: data.percentageOperational
+          });
+        } else {
+          const profile = (data.profiles || []).find(p => p.id === Number(selectedId) || p.id === selectedId);
+          if (profile) {
+            const chs = Array.isArray(profile.channels) ? profile.channels : [];
+            const total = chs.length;
+            const active = chs.filter(c => Boolean(c.isActive)).length;
+            const pct = total > 0 ? Math.round((active / total) * 100) : 0;
+            this.view.renderChannelsMetric({
+              totalChannels: total,
+              activeChannels: active,
+              percentageOperational: pct
+            });
+          }
+        }
+      });
     } catch (err) {
       console.error("DashboardController: Error loading profiles metric:", err);
       const serverMessage = err.serverMessage || err.message || "Server did not respond";
-      this.view.renderProfilesError(serverMessage);
-      this.view.renderChannelsDropdown([], serverMessage);
+      this.view.renderChannelsError(serverMessage);
+      this.view.renderWorkspacesDropdown([], serverMessage);
     }
   }
 

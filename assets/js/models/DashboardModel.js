@@ -115,7 +115,7 @@ export class DashboardModel {
 
   /**
    * Fetches user profiles from /profiles/user/:clerkId
-   * Computes active count, total count, and operational percentage based on isActive.
+   * Extracts all channels across all profiles and computes channel metrics.
    * Stores the profiles from the first call to prevent redundant requests.
    * Throws errors if server fails so the view can display an error state.
    */
@@ -132,22 +132,38 @@ export class DashboardModel {
     }
 
     const data = await this.apiService.fetchUserProfiles(clerkId);
-    const profilesList = Array.isArray(data)
-      ? data
-      : (data.profiles || data.data);
-
-    if (!Array.isArray(profilesList)) {
-      const msg = data?.message || data?.error || "Received invalid response from profiles server";
-      const err = new Error(msg);
-      err.serverMessage = msg;
-      throw err;
+    let profilesList = [];
+    if (Array.isArray(data)) {
+      profilesList = data;
+    } else if (data && typeof data === 'object') {
+      if (Array.isArray(data.profiles)) profilesList = data.profiles;
+      else if (Array.isArray(data.data)) profilesList = data.data;
+      else if (data.id !== undefined) profilesList = [data];
     }
 
-    const total = profilesList.length;
-    const active = profilesList.filter(p => Boolean(p.isActive)).length;
-    const percentage = total > 0 ? Math.round((active / total) * 100) : 0;
+    if (!Array.isArray(profilesList) || profilesList.length === 0) {
+      if (data && (data.message || data.error)) {
+        const msg = data.message || data.error;
+        const err = new Error(msg);
+        err.serverMessage = msg;
+        throw err;
+      }
+    }
 
-    const result = { total, active, percentage, profiles: profilesList };
+    // Collect all channels across all profiles
+    const allChannels = profilesList.flatMap(p => Array.isArray(p.channels) ? p.channels : []);
+    const totalChannels = allChannels.length;
+    const activeChannels = allChannels.filter(c => Boolean(c.isActive)).length;
+    const percentageOperational = totalChannels > 0 ? Math.round((activeChannels / totalChannels) * 100) : 0;
+
+    const result = {
+      totalChannels,
+      activeChannels,
+      percentageOperational,
+      channels: allChannels,
+      profiles: profilesList
+    };
+
     this.cachedUserProfiles = result; // Stored from the first call
     return result;
   }

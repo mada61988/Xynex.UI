@@ -244,6 +244,82 @@ export class ApiService {
     return await response.json();
   }
 
+  async fetchUserTotalSales(clerkId) {
+    if (!clerkId) {
+      throw new Error("clerkId is required to fetch total sales");
+    }
+    const headers = await this.getHeaders();
+    const response = await fetch(`${CONFIG.API_BASE_URL}/users/${encodeURIComponent(clerkId)}/total-sales`, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      let serverMessage = response.statusText;
+      try {
+        const errorData = await response.json();
+        serverMessage = errorData.message || errorData.error || errorData.detail || JSON.stringify(errorData);
+      } catch (e) {
+        try {
+          const text = await response.text();
+          if (text) serverMessage = text;
+        } catch (_) {}
+      }
+
+      const err = new Error(serverMessage || `Request failed with status ${response.status}`);
+      err.status = response.status;
+      err.serverMessage = serverMessage;
+      throw err;
+    }
+
+    return await response.json();
+  }
+
+  async fetchWorkspaceTotalSales(workspaceId) {
+    if (!workspaceId) {
+      throw new Error("workspaceId is required to fetch workspace sales");
+    }
+    const headers = await this.getHeaders();
+    let response;
+    try {
+      response = await fetch(`${CONFIG.API_BASE_URL}/workspaces/${encodeURIComponent(workspaceId)}/total-sales`, {
+        method: 'GET',
+        headers
+      });
+      if (response.status === 404) {
+        response = await fetch(`${CONFIG.API_BASE_URL}/workspace/${encodeURIComponent(workspaceId)}/total-sales`, {
+          method: 'GET',
+          headers
+        });
+      }
+    } catch (e) {
+      response = await fetch(`${CONFIG.API_BASE_URL}/workspace/${encodeURIComponent(workspaceId)}/total-sales`, {
+        method: 'GET',
+        headers
+      });
+    }
+
+    if (!response.ok) {
+      let serverMessage = response.statusText;
+      try {
+        const errorData = await response.json();
+        serverMessage = errorData.message || errorData.error || errorData.detail || JSON.stringify(errorData);
+      } catch (e) {
+        try {
+          const text = await response.text();
+          if (text) serverMessage = text;
+        } catch (_) {}
+      }
+
+      const err = new Error(serverMessage || `Request failed with status ${response.status}`);
+      err.status = response.status;
+      err.serverMessage = serverMessage;
+      throw err;
+    }
+
+    return await response.json();
+  }
+
   async fetchRoles() {
     const headers = await this.getHeaders();
     const response = await fetch(`${CONFIG.API_BASE_URL}/users/roles`, {

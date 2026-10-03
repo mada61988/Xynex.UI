@@ -38,7 +38,8 @@ export class DashboardController {
       await Promise.allSettled([
         this.loadMessagesCount(),
         this.loadProfilesMetric(),
-        this.loadDmToCheckout()
+        this.loadDmToCheckout(),
+        this.loadTotalSales()
       ]);
     } finally {
       this.view.hidePageLoading();
@@ -54,7 +55,8 @@ export class DashboardController {
             await Promise.allSettled([
               this.loadMessagesCount(),
               this.loadProfilesMetric(),
-              this.loadDmToCheckout()
+              this.loadDmToCheckout(),
+              this.loadTotalSales()
             ]);
           } finally {
             this.view.hidePageLoading();
@@ -183,16 +185,17 @@ export class DashboardController {
           });
         }
 
-        // 2. Fetch overall user messages count & overall DM-to-checkout rate
+        // 2. Fetch overall user messages count, DM-to-checkout rate, and total sales
         await Promise.allSettled([
           this.loadMessagesCount(),
-          this.loadDmToCheckout('all')
+          this.loadDmToCheckout('all'),
+          this.loadTotalSales('all')
         ]);
         return;
       }
 
       // A specific workspace is chosen:
-      // Concurrently fetch channels, messages, and DM-to-checkout rate for that workspace
+      // Concurrently fetch channels, messages, DM-to-checkout rate, and total sales for that workspace
       await Promise.allSettled([
         (async () => {
           this.view.setChannelsLoading();
@@ -210,11 +213,32 @@ export class DashboardController {
         })(),
         (async () => {
           await this.loadDmToCheckout(selectedId);
+        })(),
+        (async () => {
+          await this.loadTotalSales(selectedId);
         })()
       ]);
     } finally {
       // Hide the centered loading spinner once all data is fetched
       this.view.hidePageLoading();
+    }
+  }
+
+  async loadTotalSales(workspaceId = null) {
+    const clerkId = this.authModel?.user?.id || window.Clerk?.user?.id;
+    if (!clerkId && (!workspaceId || workspaceId === 'all')) {
+      this.view.renderTotalSalesError("Authentication required");
+      return;
+    }
+
+    this.view.setTotalSalesLoading();
+    try {
+      const salesData = await this.model.fetchTotalSales({ clerkId, workspaceId });
+      this.view.renderTotalSales(salesData);
+    } catch (err) {
+      console.error("DashboardController: Error loading total sales:", err);
+      const serverMessage = err.serverMessage || err.message || "Server did not respond";
+      this.view.renderTotalSalesError(serverMessage);
     }
   }
 

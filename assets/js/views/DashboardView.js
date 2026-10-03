@@ -607,6 +607,96 @@ export class DashboardView {
     }
   }
 
+  renderTotalSales({ formattedSales, currency }) {
+    const card = document.getElementById('card-metric-sales');
+    const icon = document.getElementById('icon-metric-sales');
+    if (card) card.classList.remove('border-rose-500/30');
+    if (icon) {
+      icon.className = "w-8 h-8 rounded-lg bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-white transition";
+    }
+
+    const elSales = document.getElementById('metric-total-sales');
+    const elTrend = document.getElementById('metric-sales-trend');
+    const elSubtext = document.getElementById('metric-sales-subtext');
+
+    if (elSales) {
+      elSales.className = "text-3xl font-extrabold text-white tracking-tight mb-2";
+      elSales.textContent = formattedSales || '$0';
+    }
+
+    if (elTrend) {
+      elTrend.className = "text-emerald-400 font-semibold flex items-center gap-1";
+      elTrend.innerHTML = `<i class="fa-solid fa-arrow-trend-up text-[10px]"></i> Live Synced`;
+    }
+
+    if (elSubtext) {
+      elSubtext.textContent = `· ${currency || 'USD'} total`;
+    }
+  }
+
+  setTotalSalesLoading() {
+    const card = document.getElementById('card-metric-sales');
+    const icon = document.getElementById('icon-metric-sales');
+    if (card) card.classList.remove('border-rose-500/30');
+    if (icon) {
+      icon.className = "w-8 h-8 rounded-lg bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-white transition";
+    }
+
+    const elSales = document.getElementById('metric-total-sales');
+    const elTrend = document.getElementById('metric-sales-trend');
+
+    if (elSales) {
+      elSales.className = "text-3xl font-extrabold text-white tracking-tight mb-2";
+      elSales.innerHTML = `
+        <span class="inline-flex items-center gap-2">
+          <svg class="animate-spin h-6 w-6 text-zinc-400 inline" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </span>
+      `;
+    }
+
+    if (elTrend) {
+      elTrend.className = "text-zinc-500 font-medium flex items-center gap-1";
+      elTrend.textContent = "Querying sales...";
+    }
+  }
+
+  renderTotalSalesError(errorMessage) {
+    const card = document.getElementById('card-metric-sales');
+    const icon = document.getElementById('icon-metric-sales');
+    if (card) card.classList.add('border-rose-500/30');
+    if (icon) {
+      icon.className = "w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 transition";
+    }
+
+    const elSales = document.getElementById('metric-total-sales');
+    const elTrend = document.getElementById('metric-sales-trend');
+    const elSubtext = document.getElementById('metric-sales-subtext');
+
+    if (elSales) {
+      elSales.className = "text-2xl font-bold text-rose-400 tracking-tight mb-2 flex items-center gap-2";
+      elSales.innerHTML = `
+        <i class="fa-solid fa-circle-exclamation text-lg"></i>
+        <span>Unavailable</span>
+      `;
+    }
+
+    if (elTrend) {
+      elTrend.className = "text-rose-400 font-medium flex items-center gap-1.5 truncate max-w-[220px]";
+      elTrend.title = errorMessage || 'Server did not respond';
+      elTrend.innerHTML = `
+        <span class="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0 animate-pulse"></span>
+        <span class="truncate text-xs">${this._escape(errorMessage || 'Server did not respond')}</span>
+      `;
+    }
+
+    if (elSubtext) {
+      elSubtext.textContent = '';
+    }
+  }
+
   renderUsersLoading() {
     if (this.usersCountBadge) {
       this.usersCountBadge.textContent = 'Syncing...';

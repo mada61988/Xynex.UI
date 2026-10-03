@@ -292,20 +292,20 @@
           </div>
         </div>
 
-        <!-- Metric Card 4: Automated Revenue -->
-        <div class="bento-card rounded-2xl p-6 relative overflow-hidden group">
+        <!-- Metric Card 4: Total Sales -->
+        <div id="card-metric-sales" class="bento-card rounded-2xl p-6 relative overflow-hidden group transition duration-300">
           <div class="flex items-center justify-between text-zinc-400 mb-4">
-            <span class="text-xs font-semibold uppercase tracking-wider">Automated Sales</span>
-            <div class="w-8 h-8 rounded-lg bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-white">
+            <span class="text-xs font-semibold uppercase tracking-wider">Total Sales</span>
+            <div id="icon-metric-sales" class="w-8 h-8 rounded-lg bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-white transition">
               <i class="fa-solid fa-sack-dollar text-xs text-emerald-400"></i>
             </div>
           </div>
-          <div class="text-3xl font-extrabold text-white tracking-tight mb-2">$142,850</div>
+          <div id="metric-total-sales" class="text-3xl font-extrabold text-white tracking-tight mb-2">—</div>
           <div class="flex items-center gap-2 text-xs">
-            <span class="text-emerald-400 font-semibold flex items-center gap-0.5">
-              <i class="fa-solid fa-arrow-trend-up text-[10px]"></i> +31.4%
+            <span id="metric-sales-trend" class="text-zinc-500 font-medium flex items-center gap-1">
+              Syncing sales...
             </span>
-            <span class="text-zinc-500">Shopify synced</span>
+            <span id="metric-sales-subtext" class="text-zinc-600">· API query</span>
           </div>
         </div>
 

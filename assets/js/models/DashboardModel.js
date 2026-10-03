@@ -226,6 +226,52 @@ export class DashboardModel {
   }
 
   /**
+   * Fetches total sales and currency for all workspaces or a specific workspace.
+   * Reads { totalUserSales, currency } or workspace sales and formats output.
+   */
+  async fetchTotalSales({ clerkId, workspaceId = null }) {
+    let data;
+    if (workspaceId && workspaceId !== 'all') {
+      data = await this.apiService.fetchWorkspaceTotalSales(workspaceId);
+    } else {
+      if (!clerkId) {
+        const err = new Error("Authentication required");
+        err.serverMessage = "No active Clerk session";
+        throw err;
+      }
+      data = await this.apiService.fetchUserTotalSales(clerkId);
+    }
+
+    if (data && data.message && typeof data.message === 'string' && data.totalUserSales === undefined && data.totalSales === undefined && data.totalWorkspaceSales === undefined) {
+      const err = new Error(data.message);
+      err.serverMessage = data.message;
+      throw err;
+    }
+
+    const rawSales = data?.totalUserSales ?? data?.totalWorkspaceSales ?? data?.totalSales ?? data?.sales ?? data?.amount ?? 0;
+    const currency = data?.currency || 'USD';
+    const amount = Number(rawSales) || 0;
+
+    let formattedSales;
+    try {
+      formattedSales = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currency,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2
+      }).format(amount);
+    } catch (e) {
+      formattedSales = `${amount.toLocaleString()} ${currency}`;
+    }
+
+    return {
+      amount,
+      currency,
+      formattedSales
+    };
+  }
+
+  /**
    * Fetches user workspaces from /workspaces/user/:clerkId
    * Extracts all channels across all workspaces/profiles and computes channel metrics.
    * Stores the workspaces from the first call to prevent redundant requests.

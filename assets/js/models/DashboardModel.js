@@ -95,7 +95,8 @@ export class DashboardModel {
     const data = await this.apiService.fetchUserMessagesCount(clerkId);
     let count = data;
     if (data && typeof data === 'object') {
-      if (data.count !== undefined) count = data.count;
+      if (data.messageCount !== undefined) count = data.messageCount;
+      else if (data.count !== undefined) count = data.count;
       else if (data.total !== undefined) count = data.total;
       else if (data.messagesCount !== undefined) count = data.messagesCount;
       else if (data.messages !== undefined) count = data.messages;
@@ -108,6 +109,70 @@ export class DashboardModel {
     const parsed = Number(count);
     if (isNaN(parsed)) {
       const err = new Error("Invalid count returned from server");
+      throw err;
+    }
+    return parsed;
+  }
+
+  /**
+   * Fetches channels for a specific workspace from /channels/workspace/:workspaceId
+   */
+  async fetchWorkspaceChannels(workspaceId) {
+    if (!workspaceId) {
+      const err = new Error("workspaceId is required");
+      throw err;
+    }
+
+    const data = await this.apiService.fetchWorkspaceChannels(workspaceId);
+    let channelsList = [];
+    if (Array.isArray(data)) {
+      channelsList = data;
+    } else if (data && typeof data === 'object') {
+      if (Array.isArray(data.channels)) channelsList = data.channels;
+      else if (Array.isArray(data.data)) channelsList = data.data;
+      else if (data.id !== undefined) channelsList = [data];
+    }
+
+    const totalChannels = channelsList.length;
+    const activeChannels = channelsList.filter(c => Boolean(c.isActive)).length;
+    const percentageOperational = totalChannels > 0 ? Math.round((activeChannels / totalChannels) * 100) : 0;
+
+    return {
+      totalChannels,
+      activeChannels,
+      percentageOperational,
+      channels: channelsList
+    };
+  }
+
+  /**
+   * Fetches messages count for a specific workspace from /chats/workspace/:workspaceId/messages
+   * Reads { messageCount } from response.
+   */
+  async fetchWorkspaceMessagesCount(workspaceId) {
+    if (!workspaceId) {
+      const err = new Error("workspaceId is required");
+      throw err;
+    }
+
+    const data = await this.apiService.fetchWorkspaceMessagesCount(workspaceId);
+    let count = 0;
+    if (typeof data === 'number') {
+      count = data;
+    } else if (data && typeof data === 'object') {
+      if (data.messageCount !== undefined) count = data.messageCount;
+      else if (data.count !== undefined) count = data.count;
+      else if (data.total !== undefined) count = data.total;
+      else if (data.messagesCount !== undefined) count = data.messagesCount;
+      else if (data.message !== undefined && typeof data.message === 'string') {
+        const err = new Error(data.message);
+        err.serverMessage = data.message;
+        throw err;
+      }
+    }
+    const parsed = Number(count);
+    if (isNaN(parsed)) {
+      const err = new Error("Invalid messageCount returned from workspace messages API");
       throw err;
     }
     return parsed;

@@ -6,6 +6,8 @@ export class DashboardController {
     this.messagesPollInterval = null;
     this.messagesTickerInterval = null;
     this.lastMessagesSyncedTime = null;
+    this.currentSelectedWorkspaceId = 'all';
+    this.cachedOverallData = null;
   }
 
   async init() {
@@ -34,7 +36,7 @@ export class DashboardController {
     await this.loadMessagesCount();
     this.startMessagesPolling();
 
-    // 7. Fetch dynamic profiles metric for current Clerk user
+    // 7. Fetch dynamic workspaces and channels metric for current Clerk user
     await this.loadProfilesMetric();
 
     // 8. Re-fetch if auth state updates dynamically
@@ -62,7 +64,11 @@ export class DashboardController {
     // 2-minute polling interval (120,000 ms)
     if (!this.messagesPollInterval) {
       this.messagesPollInterval = setInterval(async () => {
-        await this.loadMessagesCount(true);
+        if (this.currentSelectedWorkspaceId && this.currentSelectedWorkspaceId !== 'all') {
+          await this.loadWorkspaceMessagesCount(this.currentSelectedWorkspaceId, true);
+        } else {
+          await this.loadMessagesCount(true);
+        }
       }, 120000);
     }
   }
@@ -92,6 +98,29 @@ export class DashboardController {
     }
   }
 
+  async loadWorkspaceMessagesCount(workspaceId, isBackground = false) {
+    if (!workspaceId || workspaceId === 'all') {
+      return this.loadMessagesCount(isBackground);
+    }
+
+    if (!isBackground) {
+      this.view.setMessagesCountLoading();
+    }
+
+    try {
+      const count = await this.model.fetchWorkspaceMessagesCount(workspaceId);
+      this.view.renderMessagesCount(count);
+      this.lastMessagesSyncedTime = Date.now();
+      this.view.updateMessagesLastSynced(0);
+    } catch (err) {
+      console.error(`DashboardController: Error loading messages for workspace ${workspaceId}:`, err);
+      const serverMessage = err.serverMessage || err.message || "Server did not respond";
+      if (!isBackground) {
+        this.view.renderMessagesCountError(serverMessage);
+      }
+    }
+  }
+
   async loadProfilesMetric() {
     const clerkId = this.authModel?.user?.id || window.Clerk?.user?.id;
     if (!clerkId) {
@@ -104,6 +133,7 @@ export class DashboardController {
     try {
       // Calls fetchUserWorkspaces once and stores the workspaces to avoid redundant API requests
       const data = await this.model.fetchUserWorkspaces(clerkId);
+      this.cachedOverallData = data;
       
       // Render overall channels metric (total channels across all profiles)
       this.view.renderChannelsMetric({
@@ -112,28 +142,9 @@ export class DashboardController {
         percentageOperational: data.percentageOperational
       });
 
-      // Render workspaces dropdown and handle workspace selection
-      this.view.renderWorkspacesDropdown(data.workspaces || data.profiles || [], null, (selectedId) => {
-        if (selectedId === 'all') {
-          this.view.renderChannelsMetric({
-            totalChannels: data.totalChannels,
-            activeChannels: data.activeChannels,
-            percentageOperational: data.percentageOperational
-          });
-        } else {
-          const profile = (data.workspaces || data.profiles || []).find(p => p.id === Number(selectedId) || p.id === selectedId);
-          if (profile) {
-            const chs = Array.isArray(profile.channels) ? profile.channels : [];
-            const total = chs.length;
-            const active = chs.filter(c => Boolean(c.isActive)).length;
-            const pct = total > 0 ? Math.round((active / total) * 100) : 0;
-            this.view.renderChannelsMetric({
-              totalChannels: total,
-              activeChannels: active,
-              percentageOperational: pct
-            });
-          }
-        }
+      // Render workspaces dropdown and wire selection handler
+      this.view.renderWorkspacesDropdown(data.workspaces || data.profiles || [], null, async (selectedId) => {
+        await this.handleWorkspaceSelection(selectedId);
       });
     } catch (err) {
       console.error("DashboardController: Error loading workspaces & channels metric:", err);
@@ -141,6 +152,41 @@ export class DashboardController {
       this.view.renderChannelsError(serverMessage);
       this.view.renderWorkspacesDropdown([], serverMessage);
     }
+  }
+
+  async handleWorkspaceSelection(selectedId) {
+    this.currentSelectedWorkspaceId = selectedId;
+
+    if (selectedId === 'all') {
+      // 1. Render overall channels metric across all workspaces
+      if (this.cachedOverallData) {
+        this.view.renderChannelsMetric({
+          totalChannels: this.cachedOverallData.totalChannels,
+          activeChannels: this.cachedOverallData.activeChannels,
+          percentageOperational: this.cachedOverallData.percentageOperational
+        });
+      }
+
+      // 2. Fetch overall user messages count
+      await this.loadMessagesCount();
+      return;
+    }
+
+    // A specific workspace is chosen:
+    // 1. In the channels card, use /channels/workspace/:workspaceId
+    this.view.setChannelsLoading();
+    try {
+      const channelData = await this.model.fetchWorkspaceChannels(selectedId);
+      this.view.renderChannelsMetric(channelData);
+    } catch (err) {
+      console.error(`DashboardController: Error fetching channels for workspace ${selectedId}:`, err);
+      const serverMessage = err.serverMessage || err.message || "Failed to load workspace channels";
+      this.view.renderChannelsError(serverMessage);
+    }
+
+    // 2. In the messages card, use /chats/workspace/:workspaceId/messages
+    // 3. Reads { messageCount } returned by the endpoint
+    await this.loadWorkspaceMessagesCount(selectedId);
   }
 
   async handleNavigation(target) {

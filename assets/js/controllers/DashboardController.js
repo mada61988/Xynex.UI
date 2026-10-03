@@ -32,23 +32,33 @@ export class DashboardController {
     const metrics = await this.model.fetchMetrics();
     this.view.renderMetrics(metrics);
 
-    // 6. Fetch dynamic messages handled count for current Clerk user and start polling
-    await this.loadMessagesCount();
+    // 6. Concurrently fetch all initial dashboard data from the database
+    this.view.showPageLoading("Initializing dashboard data...");
+    try {
+      await Promise.allSettled([
+        this.loadMessagesCount(),
+        this.loadProfilesMetric(),
+        this.loadDmToCheckout()
+      ]);
+    } finally {
+      this.view.hidePageLoading();
+    }
     this.startMessagesPolling();
 
-    // 7. Fetch dynamic workspaces and channels metric for current Clerk user
-    await this.loadProfilesMetric();
-
-    // 8. Fetch dynamic DM to Checkout rate for current Clerk user
-    await this.loadDmToCheckout();
-
-    // 9. Re-fetch if auth state updates dynamically
+    // 7. Re-fetch if auth state updates dynamically
     if (this.authModel) {
-      this.authModel.onAuthStateChange(({ user }) => {
+      this.authModel.onAuthStateChange(async ({ user }) => {
         if (user && user.id) {
-          this.loadMessagesCount();
-          this.loadProfilesMetric();
-          this.loadDmToCheckout();
+          this.view.showPageLoading("Updating session data...");
+          try {
+            await Promise.allSettled([
+              this.loadMessagesCount(),
+              this.loadProfilesMetric(),
+              this.loadDmToCheckout()
+            ]);
+          } finally {
+            this.view.hidePageLoading();
+          }
         }
       });
     }

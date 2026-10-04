@@ -307,21 +307,9 @@ export class DashboardController {
 
       try {
         const workspaces = await this.model.fetchAllWorkspaces();
-        this.view.renderWorkspacesCards(
-          workspaces, 
-          async (selectedId) => {
-            const overviewLink = document.querySelector('a[href="#overview"]');
-            if (overviewLink) {
-              overviewLink.click();
-            } else {
-              this.view.showSection('overview');
-            }
-            await this.handleWorkspaceSelection(selectedId);
-          },
-          async (workspaceId) => {
-            await this.openWorkspaceDetail(workspaceId);
-          }
-        );
+        this.view.renderWorkspacesCards(workspaces, async (workspaceId) => {
+          await this.openWorkspaceDetail(workspaceId);
+        });
       } catch (err) {
         console.error("DashboardController: Error fetching workspaces:", err);
         const serverMessage = err.serverMessage || err.message || "Failed to communicate with server.";

@@ -1378,7 +1378,7 @@ export class DashboardView {
     }
   }
 
-  renderWorkspacesCards(workspaces, onSelectWorkspace = null) {
+  renderWorkspacesCards(workspaces, onSelectWorkspace = null, onOpenDetail = null) {
     if (!this.workspacesCardsContainer) return;
 
     if (this.workspacesCountBadge) {
@@ -1481,12 +1481,16 @@ export class DashboardView {
       </div>
     `;
 
+    const handleManage = typeof onOpenDetail === 'function' 
+      ? onOpenDetail 
+      : (typeof onSelectWorkspace === 'function' ? onSelectWorkspace : null);
+
     // Bind Manage button interactions on workspace cards
     this.workspacesCardsContainer.querySelectorAll('.manage-workspace-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const wsId = btn.dataset.workspaceId;
-        if (onOpenDetail) {
-          onOpenDetail(wsId);
+        if (handleManage) {
+          handleManage(wsId);
         }
       });
     });

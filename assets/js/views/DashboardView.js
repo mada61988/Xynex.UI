@@ -697,6 +697,159 @@ export class DashboardView {
     }
   }
 
+  setOrdersLoading() {
+    const statusBadge = document.getElementById('orders-status-badge');
+    const feed = document.getElementById('orders-feed-container');
+
+    if (statusBadge) {
+      statusBadge.innerHTML = `
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="orders-count-text">Syncing...</span>
+      `;
+    }
+
+    if (feed) {
+      feed.innerHTML = `
+        <div class="py-12 flex flex-col items-center justify-center text-center text-zinc-500 gap-3">
+          <svg class="animate-spin h-6 w-6 text-zinc-400" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span class="text-xs">Loading placed orders...</span>
+        </div>
+      `;
+    }
+  }
+
+  renderPlacedOrders(orders) {
+    const statusBadge = document.getElementById('orders-status-badge');
+    const feed = document.getElementById('orders-feed-container');
+    const revenueEl = document.getElementById('orders-total-revenue');
+
+    if (!Array.isArray(orders) || orders.length === 0) {
+      if (statusBadge) {
+        statusBadge.innerHTML = `
+          <span class="w-1.5 h-1.5 rounded-full bg-zinc-500"></span>
+          <span>0 Orders</span>
+        `;
+      }
+      if (revenueEl) revenueEl.textContent = 'Total: $0.00';
+      if (feed) {
+        feed.innerHTML = `
+          <div class="py-12 flex flex-col items-center justify-center text-center text-zinc-500 gap-2">
+            <i class="fa-solid fa-box-open text-3xl mb-1 text-zinc-600"></i>
+            <span class="text-sm font-semibold text-zinc-300">No placed orders found</span>
+            <span class="text-xs text-zinc-500">Orders placed by customers will appear here in real-time.</span>
+          </div>
+        `;
+      }
+      return;
+    }
+
+    const totalRev = orders.reduce((sum, o) => sum + (Number(o.totalPrice) || 0), 0);
+    if (revenueEl) {
+      revenueEl.textContent = `Total: $${totalRev.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    if (statusBadge) {
+      statusBadge.innerHTML = `
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>${orders.length} Confirmed</span>
+      `;
+    }
+
+    if (feed) {
+      feed.innerHTML = orders.map(order => {
+        const dateStr = this._formatTimeAgo(order.createdAt);
+        const senderDisplay = order.senderId 
+          ? `@${this._escape(order.senderId.replace(/^U_\d+_/, ''))}` 
+          : 'Customer';
+
+        const itemsSummary = (order.items || []).map(item => `
+          <div class="flex items-center gap-2 text-xs flex-wrap">
+            <span class="text-white font-medium">${this._escape(item.productName)}</span>
+            <span class="text-zinc-500 font-mono text-[11px]">(×${item.quantity})</span>
+            ${item.sku ? `<span class="text-[10px] font-mono text-zinc-400 bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 rounded">${this._escape(item.sku)}</span>` : ''}
+          </div>
+        `).join('');
+
+        const statusClass = String(order.status || '').toUpperCase() === 'CONFIRMED'
+          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+          : 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+
+        return `
+          <div class="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 group hover:bg-zinc-800/30 p-3 rounded-2xl transition-all duration-200">
+            <div class="flex items-start gap-3.5 min-w-0">
+              <div class="w-10 h-10 rounded-xl bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-emerald-400 font-bold text-xs shrink-0 shadow-sm mt-0.5">
+                <i class="fa-solid fa-receipt text-sm"></i>
+              </div>
+              <div class="min-w-0 space-y-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-bold text-white">Order #${order.id}</span>
+                  <span class="text-xs text-zinc-400 font-mono">${senderDisplay}</span>
+                  <span class="text-[10px] text-zinc-500">· ${dateStr}</span>
+                </div>
+                <div class="space-y-0.5">
+                  ${itemsSummary}
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 self-end sm:self-center shrink-0">
+              <span class="text-xs px-2.5 py-1 rounded-lg border font-semibold uppercase tracking-wider ${statusClass}">
+                ${this._escape(order.status || 'Confirmed')}
+              </span>
+              <span class="text-sm font-mono font-bold text-white">$${Number(order.totalPrice || 0).toFixed(2)}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  renderPlacedOrdersError(errorMessage) {
+    const statusBadge = document.getElementById('orders-status-badge');
+    const feed = document.getElementById('orders-feed-container');
+    const revenueEl = document.getElementById('orders-total-revenue');
+
+    if (statusBadge) {
+      statusBadge.innerHTML = `
+        <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+        <span class="text-rose-400">Error</span>
+      `;
+    }
+
+    if (revenueEl) revenueEl.textContent = '';
+
+    if (feed) {
+      feed.innerHTML = `
+        <div class="py-10 flex flex-col items-center justify-center text-center text-rose-400 gap-2">
+          <i class="fa-solid fa-triangle-exclamation text-2xl mb-1"></i>
+          <span class="text-xs font-semibold">${this._escape(errorMessage || 'Failed to load placed orders')}</span>
+          <span class="text-[11px] text-zinc-500">Could not retrieve orders from server.</span>
+        </div>
+      `;
+    }
+  }
+
+  _formatTimeAgo(dateString) {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const seconds = Math.floor((now - date) / 1000);
+      if (seconds < 60) return 'Just now';
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) return `${minutes}m ago`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}h ago`;
+      const days = Math.floor(hours / 24);
+      if (days < 30) return `${days}d ago`;
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } catch (_) {
+      return '';
+    }
+  }
+
   renderUsersLoading() {
     if (this.usersCountBadge) {
       this.usersCountBadge.textContent = 'Syncing...';

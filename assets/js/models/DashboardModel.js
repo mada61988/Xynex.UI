@@ -184,8 +184,10 @@ export class DashboardModel {
    */
   async fetchDmToCheckout({ clerkId, workspaceId = null }) {
     let data;
+    let rawVal = 0;
     if (workspaceId && workspaceId !== 'all') {
       data = await this.apiService.fetchWorkspaceDmToCheckout(workspaceId);
+      rawVal = data.workspaceDmToCheckout;
     } else {
       if (!clerkId) {
         const err = new Error("Authentication required");
@@ -193,26 +195,27 @@ export class DashboardModel {
         throw err;
       }
       data = await this.apiService.fetchUserDmToCheckout(clerkId);
+      rawVal = data.overAllDmToCheckout;
     }
 
-    let rawVal = 0;
-    if (typeof data === 'number') {
-      rawVal = data;
-    } else if (data && typeof data === 'object') {
-      if (data.channelDmToCheckout !== undefined) {
-        rawVal = data.channelDmToCheckout;
-      } else if (data.dmToCheckout !== undefined) {
-        rawVal = data.dmToCheckout;
-      } else if (data.conversionRate !== undefined) {
-        rawVal = data.conversionRate;
-      } else if (data.rate !== undefined) {
-        rawVal = data.rate;
-      } else if (data.message !== undefined && typeof data.message === 'string') {
-        const err = new Error(data.message);
-        err.serverMessage = data.message;
-        throw err;
-      }
-    }
+    
+    // if (typeof data === 'number') {
+    //   rawVal = data;
+    // } else if (data && typeof data === 'object') {
+    //   if (data.workspaceDmToCheckout !== undefined) {
+    //     rawVal = data.channelDmToCheckout;
+    //   } else if (data.dmToCheckout !== undefined) {
+    //     rawVal = data.dmToCheckout;
+    //   } else if (data.conversionRate !== undefined) {
+    //     rawVal = data.conversionRate;
+    //   } else if (data.rate !== undefined) {
+    //     rawVal = data.rate;
+    //   } else if (data.message !== undefined && typeof data.message === 'string') {
+    //     const err = new Error(data.message);
+    //     err.serverMessage = data.message;
+    //     throw err;
+    //   }
+    // }
 
     const num = Number(rawVal);
     if (isNaN(num)) {
@@ -269,6 +272,40 @@ export class DashboardModel {
       currency,
       formattedSales
     };
+  }
+
+  /**
+   * Fetches placed orders for all workspaces or a specific workspace.
+   */
+  async fetchPlacedOrders({ clerkId, workspaceId = null }) {
+    if (!clerkId) {
+      const err = new Error("Authentication required");
+      err.serverMessage = "No active Clerk session";
+      throw err;
+    }
+
+    let data;
+    if (workspaceId && workspaceId !== 'all') {
+      data = await this.apiService.fetchWorkspacePlacedOrders(clerkId, workspaceId);
+    } else {
+      data = await this.apiService.fetchUserPlacedOrders(clerkId);
+    }
+
+    let ordersList = [];
+    if (Array.isArray(data)) {
+      ordersList = data;
+    } else if (data && typeof data === 'object') {
+      if (Array.isArray(data.orders)) ordersList = data.orders;
+      else if (Array.isArray(data.data)) ordersList = data.data;
+      else if (data.id !== undefined) ordersList = [data];
+      else if (data.message && typeof data.message === 'string') {
+        const err = new Error(data.message);
+        err.serverMessage = data.message;
+        throw err;
+      }
+    }
+
+    return ordersList;
   }
 
   /**

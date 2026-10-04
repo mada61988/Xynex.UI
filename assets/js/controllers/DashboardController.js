@@ -39,7 +39,8 @@ export class DashboardController {
         this.loadMessagesCount(),
         this.loadProfilesMetric(),
         this.loadDmToCheckout(),
-        this.loadTotalSales()
+        this.loadTotalSales(),
+        this.loadPlacedOrders()
       ]);
     } finally {
       this.view.hidePageLoading();
@@ -56,7 +57,8 @@ export class DashboardController {
               this.loadMessagesCount(),
               this.loadProfilesMetric(),
               this.loadDmToCheckout(),
-              this.loadTotalSales()
+              this.loadTotalSales(),
+              this.loadPlacedOrders()
             ]);
           } finally {
             this.view.hidePageLoading();
@@ -185,17 +187,18 @@ export class DashboardController {
           });
         }
 
-        // 2. Fetch overall user messages count, DM-to-checkout rate, and total sales
+        // 2. Fetch overall user messages count, DM-to-checkout rate, total sales, and placed orders
         await Promise.allSettled([
           this.loadMessagesCount(),
           this.loadDmToCheckout('all'),
-          this.loadTotalSales('all')
+          this.loadTotalSales('all'),
+          this.loadPlacedOrders('all')
         ]);
         return;
       }
 
       // A specific workspace is chosen:
-      // Concurrently fetch channels, messages, DM-to-checkout rate, and total sales for that workspace
+      // Concurrently fetch channels, messages, DM-to-checkout rate, total sales, and placed orders for that workspace
       await Promise.allSettled([
         (async () => {
           this.view.setChannelsLoading();
@@ -216,11 +219,32 @@ export class DashboardController {
         })(),
         (async () => {
           await this.loadTotalSales(selectedId);
+        })(),
+        (async () => {
+          await this.loadPlacedOrders(selectedId);
         })()
       ]);
     } finally {
       // Hide the centered loading spinner once all data is fetched
       this.view.hidePageLoading();
+    }
+  }
+
+  async loadPlacedOrders(workspaceId = null) {
+    const clerkId = this.authModel?.user?.id || window.Clerk?.user?.id;
+    if (!clerkId) {
+      this.view.renderPlacedOrdersError("Authentication required");
+      return;
+    }
+
+    this.view.setOrdersLoading();
+    try {
+      const orders = await this.model.fetchPlacedOrders({ clerkId, workspaceId });
+      this.view.renderPlacedOrders(orders);
+    } catch (err) {
+      console.error("DashboardController: Error loading placed orders:", err);
+      const serverMessage = err.serverMessage || err.message || "Failed to load placed orders";
+      this.view.renderPlacedOrdersError(serverMessage);
     }
   }
 

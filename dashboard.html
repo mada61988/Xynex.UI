@@ -104,10 +104,10 @@
 
         <a href="#chatbots" class="sidebar-link flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-transparent text-sm font-medium text-zinc-400 hover:text-white">
           <div class="flex items-center gap-3">
-            <i class="fa-solid fa-robot w-4 text-zinc-400"></i>
-            <span>Chatbots</span>
+            <i class="fa-solid fa-display w-4 text-zinc-400"></i>
+            <span>Workspaces</span>
           </div>
-          <span class="text-xs bg-zinc-800 px-2 py-0.5 rounded-full text-zinc-300 font-semibold border border-zinc-700">3 Online</span>
+          <!-- <span class="text-xs bg-zinc-800 px-2 py-0.5 rounded-full text-zinc-300 font-semibold border border-zinc-700">3 Online</span> -->
         </a>
 
         <a href="#integrations" class="sidebar-link flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-transparent text-sm font-medium text-zinc-400 hover:text-white">
@@ -311,94 +311,45 @@
 
       </div>
 
-      <!-- DEEP BENTO GRID: LIVE MULTIMODAL FEED & MODEL PERFORMANCE -->
+      <!-- DEEP BENTO GRID: LIVE ORDERS FEED & MODEL PERFORMANCE -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        <!-- Large Card: Live Multimodal Conversation Stream (2 Columns) -->
-        <div class="bento-card lg:col-span-2 rounded-3xl p-6 sm:p-8 flex flex-col justify-between">
+        <!-- Large Card: Placed Orders (2 Columns) -->
+        <div id="card-placed-orders" class="bento-card lg:col-span-2 rounded-3xl p-6 sm:p-8 flex flex-col justify-between transition duration-300">
           <div>
-            <div class="flex items-center justify-between pb-6 border-b border-zinc-800">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-zinc-800 gap-3">
               <div>
-                <h2 class="text-lg font-bold text-white tracking-tight">Live Multimodal Stream</h2>
-                <p class="text-xs text-zinc-400 mt-0.5">Real-time incoming Instagram DM photos matched to live catalog SKUs.</p>
+                <h2 class="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                  <i class="fa-solid fa-receipt text-zinc-400 text-sm"></i>
+                  <span>Placed Orders</span>
+                </h2>
+                <p class="text-xs text-zinc-400 mt-0.5">Live automated orders placed by customers across conversations.</p>
               </div>
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Streaming
-              </span>
+              <div class="flex items-center gap-2">
+                <span id="orders-status-badge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span id="orders-count-text">Syncing...</span>
+                </span>
+              </div>
             </div>
 
-            <!-- Feed Items -->
-            <div class="divide-y divide-zinc-800/60 mt-4">
-              
-              <!-- Stream Item 1 -->
-              <div class="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div class="flex items-center gap-3.5">
-                  <div class="w-10 h-10 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-300 font-bold text-xs shrink-0">
-                    <i class="fa-solid fa-camera text-sm text-zinc-400"></i>
-                  </div>
-                  <div>
-                    <div class="flex items-center gap-2">
-                      <span class="text-sm font-bold text-white">@marcus_v</span>
-                      <span class="text-[10px] text-zinc-500">2 mins ago</span>
-                    </div>
-                    <div class="text-xs text-zinc-400 mt-0.5">Photo parsed: <strong class="text-zinc-200">"Silk Trench Coat (Beige - M)"</strong> · SKU #SKU-9021</div>
-                  </div>
-                </div>
-                <div class="flex items-center gap-2 self-start sm:self-auto">
-                  <span class="text-xs px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">Checkout Created</span>
-                  <span class="text-xs font-mono font-semibold text-zinc-200">$280.00</span>
-                </div>
+            <!-- Orders Feed Container -->
+            <div id="orders-feed-container" class="divide-y divide-zinc-800/60 mt-2 max-h-[380px] overflow-y-auto no-scrollbar">
+              <div class="py-12 flex flex-col items-center justify-center text-center text-zinc-500 gap-3">
+                <svg class="animate-spin h-6 w-6 text-zinc-400" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="text-xs">Loading placed orders...</span>
               </div>
-
-              <!-- Stream Item 2 -->
-              <div class="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div class="flex items-center gap-3.5">
-                  <div class="w-10 h-10 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-300 font-bold text-xs shrink-0">
-                    <i class="fa-solid fa-image text-sm text-zinc-400"></i>
-                  </div>
-                  <div>
-                    <div class="flex items-center gap-2">
-                      <span class="text-sm font-bold text-white">@elena_design</span>
-                      <span class="text-[10px] text-zinc-500">6 mins ago</span>
-                    </div>
-                    <div class="text-xs text-zinc-400 mt-0.5">Photo parsed: <strong class="text-zinc-200">"Suede Ankle Booties (Size 38)"</strong> · SKU #SKU-4418</div>
-                  </div>
-                </div>
-                <div class="flex items-center gap-2 self-start sm:self-auto">
-                  <span class="text-xs px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">Cart Synced</span>
-                  <span class="text-xs font-mono font-semibold text-zinc-200">$195.00</span>
-                </div>
-              </div>
-
-              <!-- Stream Item 3 -->
-              <div class="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div class="flex items-center gap-3.5">
-                  <div class="w-10 h-10 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-300 font-bold text-xs shrink-0">
-                    <i class="fa-solid fa-camera text-sm text-zinc-400"></i>
-                  </div>
-                  <div>
-                    <div class="flex items-center gap-2">
-                      <span class="text-sm font-bold text-white">@karl_style</span>
-                      <span class="text-[10px] text-zinc-500">14 mins ago</span>
-                    </div>
-                    <div class="text-xs text-zinc-400 mt-0.5">Story mention: <strong class="text-zinc-200">"Oversized Wool Blazer"</strong> · SKU #SKU-1102</div>
-                  </div>
-                </div>
-                <div class="flex items-center gap-2 self-start sm:self-auto">
-                  <span class="text-xs px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">Checkout Created</span>
-                  <span class="text-xs font-mono font-semibold text-zinc-200">$340.00</span>
-                </div>
-              </div>
-
             </div>
           </div>
 
           <div class="mt-6 pt-4 border-t border-zinc-800 flex justify-between items-center text-xs">
-            <span class="text-zinc-500">Continuous background polling Meta Graph API</span>
-            <a href="#analytics" class="font-semibold text-white hover:underline flex items-center gap-1">
-              <span>View full conversation logs</span>
-              <i class="fa-solid fa-arrow-right text-[10px]"></i>
-            </a>
+            <span class="text-zinc-500 flex items-center gap-1.5">
+              <i class="fa-solid fa-bolt text-amber-400 text-[11px]"></i> Real-time checkout synchronization
+            </span>
+            <span id="orders-total-revenue" class="font-mono text-zinc-300 font-semibold"></span>
           </div>
         </div>
 

@@ -439,4 +439,36 @@ export class ApiService {
 
     return await response.json();
   }
+
+  async updateChannelStatus(channelId, isActive) {
+    if (!channelId) {
+      throw new Error("channelId is required to update channel status");
+    }
+    const headers = await this.getHeaders();
+    const response = await fetch(`${CONFIG.API_BASE_URL}/channels/${encodeURIComponent(channelId)}/status`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ isActive: Boolean(isActive) })
+    });
+
+    if (!response.ok) {
+      let serverMessage = response.statusText;
+      try {
+        const errorData = await response.json();
+        serverMessage = errorData.message || errorData.error || errorData.detail || JSON.stringify(errorData);
+      } catch (e) {
+        try {
+          const text = await response.text();
+          if (text) serverMessage = text;
+        } catch (_) {}
+      }
+
+      const err = new Error(serverMessage || `Request failed with status ${response.status}`);
+      err.status = response.status;
+      err.serverMessage = serverMessage;
+      throw err;
+    }
+
+    return await response.json();
+  }
 }

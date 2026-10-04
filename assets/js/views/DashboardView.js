@@ -1461,21 +1461,14 @@ export class DashboardView {
 
           <!-- Footer Action -->
           <div class="pt-4 border-t border-zinc-800/70 flex items-center justify-between text-xs">
+            <span class="text-zinc-500 text-[11px]">${this._formatTimeAgo(ws.createdAt)}</span>
             <button 
               type="button" 
-              class="open-workspace-detail-btn inline-flex items-center gap-1.5 text-zinc-400 hover:text-white px-2 py-1 rounded-lg hover:bg-zinc-800 transition cursor-pointer font-medium"
+              class="manage-workspace-btn inline-flex items-center gap-2 bg-white hover:bg-zinc-200 text-black px-4 py-2 rounded-xl font-semibold text-xs transition transform hover:scale-[1.02] shadow-sm cursor-pointer"
               data-workspace-id="${ws.id}"
             >
-              <span>Manage Channels</span>
-              <i class="fa-solid fa-chevron-right text-[10px]"></i>
-            </button>
-            <button 
-              type="button" 
-              class="select-workspace-card-btn inline-flex items-center gap-1.5 bg-white hover:bg-zinc-200 text-black px-3.5 py-1.5 rounded-xl font-semibold text-xs transition transform hover:scale-[1.02] shadow-sm cursor-pointer"
-              data-workspace-id="${ws.id}"
-            >
-              <span>Select</span>
-              <i class="fa-solid fa-arrow-right text-[10px]"></i>
+              <i class="fa-solid fa-sliders text-xs"></i>
+              <span>Manage</span>
             </button>
           </div>
         </div>
@@ -1488,18 +1481,8 @@ export class DashboardView {
       </div>
     `;
 
-    // Bind Select button interactions on workspace cards
-    this.workspacesCardsContainer.querySelectorAll('.select-workspace-card-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const wsId = btn.dataset.workspaceId;
-        if (onSelectWorkspace) {
-          onSelectWorkspace(wsId);
-        }
-      });
-    });
-
-    // Bind Manage button and title interactions to drill down into Workspace Detail view
-    this.workspacesCardsContainer.querySelectorAll('.open-workspace-detail-btn').forEach(btn => {
+    // Bind Manage button interactions on workspace cards
+    this.workspacesCardsContainer.querySelectorAll('.manage-workspace-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const wsId = btn.dataset.workspaceId;
         if (onOpenDetail) {
@@ -1509,7 +1492,7 @@ export class DashboardView {
     });
   }
 
-  renderWorkspaceDetailView(workspace, channels, { onBackToWorkspaces, onConfigureChannel, onSelectWorkspace }) {
+  renderWorkspaceDetailView(workspace, channels, { onBackToWorkspaces, onToggleChannelStatus }) {
     if (!this.workspaceBreadcrumbs || !this.workspaceDetailContent) return;
 
     const isActive = String(workspace.status || '').toLowerCase() === 'active';
@@ -1518,21 +1501,23 @@ export class DashboardView {
     const percentage = channelsList.length > 0 ? Math.round((activeChannels / channelsList.length) * 100) : 0;
     const serviceType = (workspace.serviceType || 'product_based').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
-    // 1. Dynamic Breadcrumbs: Workspaces / [Workspace Name]
+    // 1. Dynamic Breadcrumbs At The Top Left: Workspaces / [Workspace Name]
     this.workspaceBreadcrumbs.innerHTML = `
-      <button 
-        type="button" 
-        class="breadcrumb-btn text-zinc-400 hover:text-white transition flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-zinc-800/60 cursor-pointer" 
-        data-target="workspaces"
-      >
-        <i class="fa-solid fa-briefcase text-xs"></i>
-        <span>Workspaces</span>
-      </button>
-      <i class="fa-solid fa-chevron-right text-[10px] text-zinc-600"></i>
-      <span class="text-white font-semibold flex items-center gap-2 px-2 py-1">
-        <span class="w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}"></span>
-        <span>${this._escape(workspace.name || `Workspace #${workspace.id}`)}</span>
-      </span>
+      <div class="flex items-center gap-2 text-xs sm:text-sm font-medium">
+        <button 
+          type="button" 
+          class="breadcrumb-btn text-zinc-400 hover:text-white transition flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#111114] border border-zinc-800 hover:border-zinc-700 cursor-pointer shadow-sm" 
+          data-target="workspaces"
+        >
+          <i class="fa-solid fa-briefcase text-xs text-zinc-400"></i>
+          <span>Workspaces</span>
+        </button>
+        <i class="fa-solid fa-chevron-right text-[10px] text-zinc-600"></i>
+        <span class="text-white font-semibold flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-[#111114] border border-zinc-800 shadow-sm">
+          <span class="w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}"></span>
+          <span>${this._escape(workspace.name || `Workspace #${workspace.id}`)}</span>
+        </span>
+      </div>
     `;
 
     // 2. Channels Cards HTML
@@ -1560,16 +1545,35 @@ export class DashboardView {
                 </div>
               </div>
 
-              <div class="pt-3 border-t border-zinc-800/80 flex items-center justify-between">
-                <span class="text-[11px] text-zinc-500">${this._formatTimeAgo(c.createdAt)}</span>
-                <button 
-                  type="button" 
-                  class="configure-channel-btn inline-flex items-center gap-1.5 text-zinc-300 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 px-3 py-1.5 rounded-xl font-semibold text-xs transition cursor-pointer" 
-                  data-channel-id="${c.id}"
-                >
-                  <i class="fa-solid fa-gear text-xs"></i>
-                  <span>Configure</span>
-                </button>
+              <div class="pt-4 border-t border-zinc-800/70 flex items-center justify-between">
+                <div class="flex flex-col">
+                  <span class="text-xs font-semibold text-white">Channel Status</span>
+                  <span class="text-[10px] text-zinc-500" id="channel-toggle-subtext-${c.id}">${isChActive ? 'Traffic enabled' : 'Traffic paused'}</span>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <button 
+                    type="button" 
+                    role="switch" 
+                    aria-checked="${isChActive ? 'true' : 'false'}" 
+                    id="channel-toggle-${c.id}" 
+                    data-channel-id="${c.id}" 
+                    data-active="${isChActive ? 'true' : 'false'}" 
+                    class="channel-toggle-btn relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isChActive ? 'bg-emerald-500' : 'bg-zinc-700'}"
+                    title="${isChActive ? 'Click to deactivate channel' : 'Click to activate channel'}"
+                  >
+                    <span class="sr-only">Toggle ${chPlatform} channel</span>
+                    <span 
+                      id="channel-toggle-thumb-${c.id}" 
+                      class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${isChActive ? 'translate-x-5' : 'translate-x-0'} flex items-center justify-center"
+                    >
+                      <svg id="channel-toggle-spinner-${c.id}" class="hidden animate-spin h-3 w-3 text-zinc-800" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    </span>
+                  </button>
+                </div>
               </div>
             </div>
           `;
@@ -1657,14 +1661,80 @@ export class DashboardView {
       selectBtn.addEventListener('click', () => onSelectWorkspace(workspace.id));
     }
 
-    this.workspaceDetailContent.querySelectorAll('.configure-channel-btn').forEach(btn => {
+    this.workspaceDetailContent.querySelectorAll('.channel-toggle-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const channelId = Number(btn.dataset.channelId);
-        if (onConfigureChannel) {
-          onConfigureChannel(channelId);
+        const currentActive = btn.dataset.active === 'true';
+        if (onToggleChannelStatus) {
+          onToggleChannelStatus(channelId, currentActive);
         }
       });
     });
+  }
+
+  setChannelToggleLoading(channelId, isLoading) {
+    const btn = document.getElementById(`channel-toggle-${channelId}`);
+    const spinner = document.getElementById(`channel-toggle-spinner-${channelId}`);
+    if (btn) {
+      btn.disabled = isLoading;
+      btn.classList.toggle('opacity-70', isLoading);
+      btn.classList.toggle('cursor-wait', isLoading);
+    }
+    if (spinner) {
+      spinner.classList.toggle('hidden', !isLoading);
+    }
+  }
+
+  updateChannelToggleState(channelId, newIsActive) {
+    const btn = document.getElementById(`channel-toggle-${channelId}`);
+    const thumb = document.getElementById(`channel-toggle-thumb-${channelId}`);
+    const badge = document.getElementById(`channel-status-badge-${channelId}`);
+    const dot = document.getElementById(`channel-status-dot-${channelId}`);
+    const text = document.getElementById(`channel-status-text-${channelId}`);
+    const subtext = document.getElementById(`channel-toggle-subtext-${channelId}`);
+
+    if (btn) {
+      btn.dataset.active = newIsActive ? 'true' : 'false';
+      btn.setAttribute('aria-checked', newIsActive ? 'true' : 'false');
+      btn.title = newIsActive ? 'Click to deactivate channel' : 'Click to activate channel';
+      if (newIsActive) {
+        btn.classList.remove('bg-zinc-700');
+        btn.classList.add('bg-emerald-500');
+      } else {
+        btn.classList.remove('bg-emerald-500');
+        btn.classList.add('bg-zinc-700');
+      }
+    }
+
+    if (thumb) {
+      if (newIsActive) {
+        thumb.classList.remove('translate-x-0');
+        thumb.classList.add('translate-x-5');
+      } else {
+        thumb.classList.remove('translate-x-5');
+        thumb.classList.add('translate-x-0');
+      }
+    }
+
+    if (badge) {
+      if (newIsActive) {
+        badge.className = "inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors duration-300 bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+      } else {
+        badge.className = "inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors duration-300 bg-zinc-800 text-zinc-400 border-zinc-700";
+      }
+    }
+
+    if (dot) {
+      dot.className = `w-1.5 h-1.5 rounded-full ${newIsActive ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}`;
+    }
+
+    if (text) {
+      text.textContent = newIsActive ? 'Active' : 'Offline';
+    }
+
+    if (subtext) {
+      subtext.textContent = newIsActive ? 'Traffic enabled' : 'Traffic paused';
+    }
   }
 
   renderChannelConfigView(workspace, channel, { onBackToWorkspaces, onBackToWorkspaceDetail }) {

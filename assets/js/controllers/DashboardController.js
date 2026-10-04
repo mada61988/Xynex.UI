@@ -360,18 +360,20 @@ export class DashboardController {
         onBackToWorkspaces: () => {
           this.handleNavigation('workspaces');
         },
-        onConfigureChannel: (channelId) => {
-          const channel = (channels || []).find(c => Number(c.id) === Number(channelId)) || {
-            id: channelId,
-            platform: 'channel',
-            isActive: true
-          };
-          this.openChannelConfig(workspace, channel, channels);
-        },
-        onSelectWorkspace: async (wsId) => {
-          const overviewLink = document.querySelector('a[href="#overview"]');
-          if (overviewLink) overviewLink.click();
-          await this.handleWorkspaceSelection(wsId);
+        onToggleChannelStatus: async (channelId, currentActive) => {
+          const targetActive = !currentActive;
+          this.view.setChannelToggleLoading(channelId, true);
+          try {
+            await this.model.updateChannelStatus(channelId, targetActive);
+            this.view.updateChannelToggleState(channelId, targetActive);
+            const ch = channels.find(c => Number(c.id) === Number(channelId));
+            if (ch) ch.isActive = targetActive;
+          } catch (err) {
+            console.error(`DashboardController: Failed to toggle channel ${channelId} status:`, err);
+            this.view.updateChannelToggleState(channelId, currentActive);
+          } finally {
+            this.view.setChannelToggleLoading(channelId, false);
+          }
         }
       });
     } catch (err) {

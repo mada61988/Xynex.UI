@@ -455,4 +455,12 @@ export class DashboardModel {
     const u = this.currentUsers.find(item => item.id === Number(userId));
     return u ? u.role : 'user';
   }
+
+  /**
+   * Updates channel status using PATCH /channels/:id/status
+   */
+  async updateChannelStatus(channelId, isActive) {
+    const data = await this.apiService.updateChannelStatus(channelId, isActive);
+    return data;
+  }
 }

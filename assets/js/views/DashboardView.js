@@ -15,6 +15,7 @@ export class DashboardView {
     this.workspacesCountBadge = document.getElementById('workspaces-count-badge');
 
     // Workspaces dropdown elements
+    this.navbarWorkspacesContainer = document.getElementById('navbar-workspaces-container');
     this.workspacesWrapper = document.getElementById('workspaces-dropdown-wrapper') || document.getElementById('channels-dropdown-wrapper');
     this.workspacesBtn = document.getElementById('workspaces-dropdown-btn') || document.getElementById('channels-dropdown-btn');
     this.workspacesMenu = document.getElementById('workspaces-dropdown-menu') || document.getElementById('channels-dropdown-menu');
@@ -180,6 +181,8 @@ export class DashboardView {
     if (this.workspacesSection) this.workspacesSection.classList.add('hidden');
     if (this.workspaceDetailSection) this.workspaceDetailSection.classList.add('hidden');
 
+    const isOverview = (sectionName === 'overview' || !sectionName || sectionName === '');
+
     if (sectionName === 'users') {
       if (this.usersSection) this.usersSection.classList.remove('hidden');
     } else if (sectionName === 'workspaces' || sectionName === 'chatbots') {
@@ -189,6 +192,19 @@ export class DashboardView {
     } else {
       if (this.overviewSection) this.overviewSection.classList.remove('hidden');
     }
+
+    // Workspaces dropdown menu is visible on the overview tab only
+    const navDropdown = this.navbarWorkspacesContainer || document.getElementById('navbar-workspaces-container');
+    if (navDropdown) {
+      if (isOverview) {
+        navDropdown.classList.remove('hidden');
+        navDropdown.classList.add('flex');
+      } else {
+        navDropdown.classList.add('hidden');
+        navDropdown.classList.remove('flex');
+      }
+    }
+
     this.setActiveSidebarLink(sectionName === 'workspace-detail' ? 'workspaces' : sectionName);
   }
 

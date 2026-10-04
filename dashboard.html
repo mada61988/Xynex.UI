@@ -102,12 +102,12 @@
           <span class="text-xs bg-zinc-800 px-2 py-0.5 rounded-full text-zinc-300 font-semibold border border-zinc-700">3 Online</span>
         </a>
 
-        <a href="#chatbots" class="sidebar-link flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-transparent text-sm font-medium text-zinc-400 hover:text-white">
+        <a href="#workspaces" class="sidebar-link flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-transparent text-sm font-medium text-zinc-400 hover:text-white">
           <div class="flex items-center gap-3">
-            <i class="fa-solid fa-display w-4 text-zinc-400"></i>
+            <i class="fa-solid fa-briefcase w-4 text-zinc-400"></i>
             <span>Workspaces</span>
           </div>
-          <!-- <span class="text-xs bg-zinc-800 px-2 py-0.5 rounded-full text-zinc-300 font-semibold border border-zinc-700">3 Online</span> -->
+          <span class="text-xs bg-zinc-800 px-2 py-0.5 rounded-full text-zinc-400 font-medium border border-zinc-700">Explore</span>
         </a>
 
         <a href="#integrations" class="sidebar-link flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-transparent text-sm font-medium text-zinc-400 hover:text-white">
@@ -443,6 +443,31 @@
 
         <!-- USERS TABLE CONTAINER -->
         <div id="users-table-container"></div>
+      </section>
+
+      <!-- SECTION: WORKSPACES -->
+      <section id="section-workspaces" class="space-y-8 hidden">
+        <!-- WORKSPACES TITLE & ACTIONS HEADER -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white flex items-center gap-3">
+              <i class="fa-solid fa-briefcase text-zinc-400 text-2xl"></i>
+              <span>Workspaces</span>
+            </h1>
+            <p class="text-xs sm:text-sm text-zinc-400 mt-1">
+              Connected multi-channel storefront workspaces, integrations, and operational states.
+            </p>
+          </div>
+
+          <!-- Total Count Badge -->
+          <div class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#111114] border border-zinc-800 text-xs text-zinc-300 font-medium shadow-sm">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span id="workspaces-count-badge">Loading workspaces...</span>
+          </div>
+        </div>
+
+        <!-- WORKSPACES CARDS CONTAINER -->
+        <div id="workspaces-cards-container"></div>
       </section>
 
     </main>

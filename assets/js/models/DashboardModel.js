@@ -378,6 +378,27 @@ export class DashboardModel {
   }
 
   /**
+   * Fetches all workspaces from /workspaces/
+   */
+  async fetchAllWorkspaces() {
+    const data = await this.apiService.fetchAllWorkspaces();
+    let list = [];
+    if (Array.isArray(data)) {
+      list = data;
+    } else if (data && typeof data === 'object') {
+      if (Array.isArray(data.workspaces)) list = data.workspaces;
+      else if (Array.isArray(data.data)) list = data.data;
+      else if (data.id !== undefined) list = [data];
+      else if (data.message && typeof data.message === 'string') {
+        const err = new Error(data.message);
+        err.serverMessage = data.message;
+        throw err;
+      }
+    }
+    return list;
+  }
+
+  /**
    * Fetches users from the fetchUsers api service.
    * Throws errors so the view can display the exact server error card.
    */

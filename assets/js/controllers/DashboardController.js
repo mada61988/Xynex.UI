@@ -301,6 +301,26 @@ export class DashboardController {
           message: serverMessage
         }, () => this.handleNavigation('users'));
       }
+    } else if (target === 'workspaces' || target === 'chatbots') {
+      this.view.showSection('workspaces');
+      this.view.renderWorkspacesCardsLoading();
+
+      try {
+        const workspaces = await this.model.fetchAllWorkspaces();
+        this.view.renderWorkspacesCards(workspaces, async (selectedId) => {
+          const overviewLink = document.querySelector('a[href="#overview"]');
+          if (overviewLink) {
+            overviewLink.click();
+          } else {
+            this.view.showSection('overview');
+          }
+          await this.handleWorkspaceSelection(selectedId);
+        });
+      } catch (err) {
+        console.error("DashboardController: Error fetching workspaces:", err);
+        const serverMessage = err.serverMessage || err.message || "Failed to communicate with server.";
+        this.view.renderWorkspacesCardsError(serverMessage, () => this.handleNavigation('workspaces'));
+      }
     } else {
       // Default to overview section
       this.view.showSection('overview');

@@ -8,8 +8,11 @@ export class DashboardView {
     this.sidebarLinks = document.querySelectorAll('.sidebar-link');
     this.overviewSection = document.getElementById('section-overview');
     this.usersSection = document.getElementById('section-users');
+    this.workspacesSection = document.getElementById('section-workspaces');
     this.usersTableContainer = document.getElementById('users-table-container');
     this.usersCountBadge = document.getElementById('users-count-badge');
+    this.workspacesCardsContainer = document.getElementById('workspaces-cards-container');
+    this.workspacesCountBadge = document.getElementById('workspaces-count-badge');
 
     // Workspaces dropdown elements
     this.workspacesWrapper = document.getElementById('workspaces-dropdown-wrapper') || document.getElementById('channels-dropdown-wrapper');
@@ -170,9 +173,15 @@ export class DashboardView {
     if (sectionName === 'users') {
       if (this.overviewSection) this.overviewSection.classList.add('hidden');
       if (this.usersSection) this.usersSection.classList.remove('hidden');
+      if (this.workspacesSection) this.workspacesSection.classList.add('hidden');
+    } else if (sectionName === 'workspaces' || sectionName === 'chatbots') {
+      if (this.overviewSection) this.overviewSection.classList.add('hidden');
+      if (this.usersSection) this.usersSection.classList.add('hidden');
+      if (this.workspacesSection) this.workspacesSection.classList.remove('hidden');
     } else {
       if (this.overviewSection) this.overviewSection.classList.remove('hidden');
       if (this.usersSection) this.usersSection.classList.add('hidden');
+      if (this.workspacesSection) this.workspacesSection.classList.add('hidden');
     }
     this.setActiveSidebarLink(sectionName);
   }
@@ -1342,6 +1351,198 @@ export class DashboardView {
       setTimeout(() => {
         if (actionCell) actionCell.innerHTML = `<span class="text-xs text-zinc-600">—</span>`;
       }, 2000);
+    }
+  }
+
+  renderWorkspacesCardsLoading() {
+    if (this.workspacesCountBadge) {
+      this.workspacesCountBadge.textContent = 'Syncing...';
+    }
+    if (this.workspacesCardsContainer) {
+      this.workspacesCardsContainer.innerHTML = `
+        <div class="bento-card rounded-3xl p-12 flex flex-col items-center justify-center gap-4 text-center">
+          <svg class="animate-spin h-8 w-8 text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <div class="text-sm font-semibold text-zinc-300">Fetching workspace directory...</div>
+          <div class="text-xs text-zinc-500">Querying /workspaces/ endpoint</div>
+        </div>
+      `;
+    }
+  }
+
+  renderWorkspacesCards(workspaces, onSelectWorkspace = null) {
+    if (!this.workspacesCardsContainer) return;
+
+    if (this.workspacesCountBadge) {
+      this.workspacesCountBadge.textContent = `${(workspaces || []).length} Workspaces Total`;
+    }
+
+    if (!Array.isArray(workspaces) || workspaces.length === 0) {
+      this.workspacesCardsContainer.innerHTML = `
+        <div class="bento-card rounded-3xl p-12 flex flex-col items-center justify-center text-center text-zinc-400">
+          <i class="fa-solid fa-briefcase text-3xl mb-3 text-zinc-600"></i>
+          <p class="text-sm font-semibold">No workspaces found.</p>
+          <p class="text-xs text-zinc-500 mt-1">Create or connect a workspace to see it listed here.</p>
+        </div>
+      `;
+      return;
+    }
+
+    const cardsHtml = workspaces.map(ws => {
+      const isActive = String(ws.status || '').toLowerCase() === 'active';
+      const channels = Array.isArray(ws.channels) ? ws.channels : [];
+      const serviceTypeFormatted = (ws.serviceType || 'product_based')
+        .split('_')
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+
+      const channelPills = channels.length > 0 
+        ? channels.map(c => {
+            const chName = c.platform || c.channel || 'channel';
+            return `
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#111114] border border-zinc-800 text-[11px] text-zinc-300 font-medium">
+                ${this._getChannelIcon(chName)}
+                <span class="capitalize">${this._escape(chName)}</span>
+                ${c.isActive ? '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>' : '<span class="w-1.5 h-1.5 rounded-full bg-zinc-600"></span>'}
+              </span>
+            `;
+          }).join('')
+        : `<span class="text-xs text-zinc-500 italic">No channels linked</span>`;
+
+      return `
+        <div class="bento-card rounded-3xl p-6 sm:p-7 relative overflow-hidden flex flex-col justify-between group transition-all duration-300 hover:border-zinc-700 hover:shadow-2xl hover:shadow-black/60">
+          <div class="absolute -top-16 -right-16 w-36 h-36 ${isActive ? 'bg-emerald-500/10' : 'bg-zinc-700/5'} rounded-full blur-2xl pointer-events-none"></div>
+
+          <div>
+            <!-- Header: Icon & Status -->
+            <div class="flex items-start justify-between gap-3 mb-4">
+              <div class="w-12 h-12 rounded-2xl bg-[#0d0d10] border border-zinc-800 flex items-center justify-center text-white font-bold text-lg shadow-sm shrink-0">
+                <i class="fa-solid fa-briefcase text-base ${isActive ? 'text-white' : 'text-zinc-500'}"></i>
+              </div>
+              <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${isActive ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}">
+                <span class="w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}"></span>
+                <span>${isActive ? 'Active' : 'Offline'}</span>
+              </span>
+            </div>
+
+            <!-- Title & Meta -->
+            <div class="mb-5">
+              <h3 class="text-lg font-bold text-white tracking-tight leading-snug group-hover:text-emerald-400 transition-colors">
+                ${this._escape(ws.name || `Workspace #${ws.id}`)}
+              </h3>
+              <div class="flex items-center gap-2 text-xs text-zinc-400 mt-1 font-mono">
+                <span>#${ws.id}</span>
+                <span>·</span>
+                <span class="font-sans text-zinc-300">${serviceTypeFormatted}</span>
+                <span>·</span>
+                <span class="uppercase font-semibold text-zinc-300">${this._escape(ws.currencyCode || 'USD')}</span>
+              </div>
+            </div>
+
+            <!-- Connected Channels Box -->
+            <div class="bg-[#0d0d10] border border-zinc-800/80 rounded-2xl p-4 mb-5 space-y-2">
+              <div class="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                <span>Integrated Channels</span>
+                <span class="font-mono text-zinc-400">${channels.length} Total</span>
+              </div>
+              <div class="flex flex-wrap gap-1.5 pt-1">
+                ${channelPills}
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer Action -->
+          <div class="pt-4 border-t border-zinc-800/70 flex items-center justify-between text-xs">
+            <span class="text-zinc-500 text-[11px]">${this._formatTimeAgo(ws.createdAt)}</span>
+            <button 
+              type="button" 
+              class="select-workspace-card-btn inline-flex items-center gap-1.5 bg-white hover:bg-zinc-200 text-black px-4 py-1.5 rounded-xl font-semibold text-xs transition transform hover:scale-[1.02] shadow-sm cursor-pointer"
+              data-workspace-id="${ws.id}"
+            >
+              <span>Select</span>
+              <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    this.workspacesCardsContainer.innerHTML = `
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        ${cardsHtml}
+      </div>
+    `;
+
+    // Bind Select button interactions on workspace cards
+    this.workspacesCardsContainer.querySelectorAll('.select-workspace-card-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const wsId = btn.dataset.workspaceId;
+        if (onSelectWorkspace) {
+          onSelectWorkspace(wsId);
+        }
+      });
+    });
+  }
+
+  renderWorkspacesCardsError(errorMessage, onRetry = null) {
+    if (this.workspacesCountBadge) {
+      this.workspacesCountBadge.innerHTML = `
+        <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+        <span class="text-rose-400 font-semibold">Error</span>
+      `;
+    }
+
+    if (!this.workspacesCardsContainer) return;
+
+    this.workspacesCardsContainer.innerHTML = `
+      <div class="bento-card rounded-3xl p-8 sm:p-12 relative overflow-hidden flex flex-col items-center text-center shadow-2xl border border-rose-500/20">
+        <div class="absolute -top-24 -right-24 w-80 h-80 bg-rose-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="relative w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-6 shadow-xl shadow-rose-950/40">
+          <i class="fa-solid fa-briefcase text-2xl"></i>
+          <span class="absolute -top-1 -right-1 flex h-3 w-3">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+          </span>
+        </div>
+
+        <h2 class="text-xl sm:text-2xl font-extrabold tracking-tight text-white mb-2">
+          Unable to Load Workspaces
+        </h2>
+        <p class="text-xs sm:text-sm text-zinc-400 max-w-lg leading-relaxed mb-6">
+          The backend server rejected the request to retrieve the workspaces directory.
+        </p>
+
+        <div class="w-full max-w-lg bg-[#0d0d10] border border-zinc-800 rounded-2xl p-4 sm:p-5 text-left shadow-inner mb-8">
+          <div class="flex items-center justify-between pb-2.5 mb-2.5 border-b border-zinc-800 text-[11px] font-mono text-zinc-500 uppercase tracking-wider">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+              <span class="text-zinc-400 font-semibold">Server Response Payload</span>
+            </div>
+            <span class="text-zinc-600 font-mono">/workspaces/</span>
+          </div>
+          <div class="font-mono text-xs text-rose-300/90 leading-relaxed break-words bg-[#111114] p-3.5 rounded-xl border border-zinc-800/80">
+            <span class="text-zinc-600 select-none">&gt; </span>${this._escape(errorMessage || 'Server did not respond')}
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-center gap-3">
+          <button 
+            type="button" 
+            id="retry-workspaces-btn"
+            class="inline-flex items-center gap-2 bg-white hover:bg-zinc-200 text-black px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition transform hover:scale-[1.02] shadow-lg cursor-pointer"
+          >
+            <i class="fa-solid fa-rotate-right text-xs"></i>
+            <span>Try Again</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    const retryBtn = document.getElementById('retry-workspaces-btn');
+    if (retryBtn && onRetry) {
+      retryBtn.addEventListener('click', () => onRetry());
     }
   }
 

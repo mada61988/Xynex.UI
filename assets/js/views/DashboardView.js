@@ -28,6 +28,11 @@ export class DashboardView {
     this.pageLoadingOverlay = document.getElementById('page-loading-overlay');
     this.pageLoadingText = document.getElementById('page-loading-text');
 
+    // Master-Detail Workspace Detail elements
+    this.workspaceDetailSection = document.getElementById('section-workspace-detail');
+    this.workspaceBreadcrumbs = document.getElementById('workspace-breadcrumbs');
+    this.workspaceDetailContent = document.getElementById('workspace-detail-content');
+
     // Callbacks for role editing
     this.onEditRoleClick = null;
     this.onSaveRoleClick = null;
@@ -170,20 +175,21 @@ export class DashboardView {
   }
 
   showSection(sectionName) {
+    if (this.overviewSection) this.overviewSection.classList.add('hidden');
+    if (this.usersSection) this.usersSection.classList.add('hidden');
+    if (this.workspacesSection) this.workspacesSection.classList.add('hidden');
+    if (this.workspaceDetailSection) this.workspaceDetailSection.classList.add('hidden');
+
     if (sectionName === 'users') {
-      if (this.overviewSection) this.overviewSection.classList.add('hidden');
       if (this.usersSection) this.usersSection.classList.remove('hidden');
-      if (this.workspacesSection) this.workspacesSection.classList.add('hidden');
     } else if (sectionName === 'workspaces' || sectionName === 'chatbots') {
-      if (this.overviewSection) this.overviewSection.classList.add('hidden');
-      if (this.usersSection) this.usersSection.classList.add('hidden');
       if (this.workspacesSection) this.workspacesSection.classList.remove('hidden');
+    } else if (sectionName === 'workspace-detail') {
+      if (this.workspaceDetailSection) this.workspaceDetailSection.classList.remove('hidden');
     } else {
       if (this.overviewSection) this.overviewSection.classList.remove('hidden');
-      if (this.usersSection) this.usersSection.classList.add('hidden');
-      if (this.workspacesSection) this.workspacesSection.classList.add('hidden');
     }
-    this.setActiveSidebarLink(sectionName);
+    this.setActiveSidebarLink(sectionName === 'workspace-detail' ? 'workspaces' : sectionName);
   }
 
   renderMetrics(metrics) {
@@ -1455,10 +1461,17 @@ export class DashboardView {
 
           <!-- Footer Action -->
           <div class="pt-4 border-t border-zinc-800/70 flex items-center justify-between text-xs">
-            <span class="text-zinc-500 text-[11px]">${this._formatTimeAgo(ws.createdAt)}</span>
             <button 
               type="button" 
-              class="select-workspace-card-btn inline-flex items-center gap-1.5 bg-white hover:bg-zinc-200 text-black px-4 py-1.5 rounded-xl font-semibold text-xs transition transform hover:scale-[1.02] shadow-sm cursor-pointer"
+              class="open-workspace-detail-btn inline-flex items-center gap-1.5 text-zinc-400 hover:text-white px-2 py-1 rounded-lg hover:bg-zinc-800 transition cursor-pointer font-medium"
+              data-workspace-id="${ws.id}"
+            >
+              <span>Manage Channels</span>
+              <i class="fa-solid fa-chevron-right text-[10px]"></i>
+            </button>
+            <button 
+              type="button" 
+              class="select-workspace-card-btn inline-flex items-center gap-1.5 bg-white hover:bg-zinc-200 text-black px-3.5 py-1.5 rounded-xl font-semibold text-xs transition transform hover:scale-[1.02] shadow-sm cursor-pointer"
               data-workspace-id="${ws.id}"
             >
               <span>Select</span>
@@ -1484,6 +1497,290 @@ export class DashboardView {
         }
       });
     });
+
+    // Bind Manage button and title interactions to drill down into Workspace Detail view
+    this.workspacesCardsContainer.querySelectorAll('.open-workspace-detail-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const wsId = btn.dataset.workspaceId;
+        if (onOpenDetail) {
+          onOpenDetail(wsId);
+        }
+      });
+    });
+  }
+
+  renderWorkspaceDetailView(workspace, channels, { onBackToWorkspaces, onConfigureChannel, onSelectWorkspace }) {
+    if (!this.workspaceBreadcrumbs || !this.workspaceDetailContent) return;
+
+    const isActive = String(workspace.status || '').toLowerCase() === 'active';
+    const channelsList = Array.isArray(channels) ? channels : [];
+    const activeChannels = channelsList.filter(c => Boolean(c.isActive)).length;
+    const percentage = channelsList.length > 0 ? Math.round((activeChannels / channelsList.length) * 100) : 0;
+    const serviceType = (workspace.serviceType || 'product_based').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+    // 1. Dynamic Breadcrumbs: Workspaces / [Workspace Name]
+    this.workspaceBreadcrumbs.innerHTML = `
+      <button 
+        type="button" 
+        class="breadcrumb-btn text-zinc-400 hover:text-white transition flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-zinc-800/60 cursor-pointer" 
+        data-target="workspaces"
+      >
+        <i class="fa-solid fa-briefcase text-xs"></i>
+        <span>Workspaces</span>
+      </button>
+      <i class="fa-solid fa-chevron-right text-[10px] text-zinc-600"></i>
+      <span class="text-white font-semibold flex items-center gap-2 px-2 py-1">
+        <span class="w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}"></span>
+        <span>${this._escape(workspace.name || `Workspace #${workspace.id}`)}</span>
+      </span>
+    `;
+
+    // 2. Channels Cards HTML
+    const channelsHtml = channelsList.length > 0
+      ? channelsList.map(c => {
+          const chPlatform = c.platform || c.channel || 'webchat';
+          const isChActive = Boolean(c.isActive);
+          return `
+            <div class="bento-card rounded-2xl p-5 relative overflow-hidden flex flex-col justify-between group hover:border-zinc-700 transition duration-200">
+              <div>
+                <div class="flex items-start justify-between gap-3 mb-3">
+                  <div class="w-10 h-10 rounded-xl bg-[#0d0d10] border border-zinc-800 flex items-center justify-center text-lg shrink-0">
+                    ${this._getChannelIcon(chPlatform)}
+                  </div>
+                  <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${isChActive ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}">
+                    <span class="w-1.5 h-1.5 rounded-full ${isChActive ? 'bg-emerald-400' : 'bg-zinc-500'}"></span>
+                    <span>${isChActive ? 'Active' : 'Offline'}</span>
+                  </span>
+                </div>
+
+                <h4 class="text-base font-bold text-white tracking-tight capitalize mb-1">${this._escape(chPlatform)}</h4>
+                <div class="space-y-1 text-xs text-zinc-400 font-mono mb-4">
+                  <div>Channel ID: #${c.id}</div>
+                  ${c.metaPageId ? `<div class="truncate text-[11px] text-zinc-500">Meta ID: ${this._escape(c.metaPageId)}</div>` : ''}
+                </div>
+              </div>
+
+              <div class="pt-3 border-t border-zinc-800/80 flex items-center justify-between">
+                <span class="text-[11px] text-zinc-500">${this._formatTimeAgo(c.createdAt)}</span>
+                <button 
+                  type="button" 
+                  class="configure-channel-btn inline-flex items-center gap-1.5 text-zinc-300 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 px-3 py-1.5 rounded-xl font-semibold text-xs transition cursor-pointer" 
+                  data-channel-id="${c.id}"
+                >
+                  <i class="fa-solid fa-gear text-xs"></i>
+                  <span>Configure</span>
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('')
+      : `
+        <div class="col-span-full bento-card rounded-2xl p-10 flex flex-col items-center justify-center text-center text-zinc-400">
+          <i class="fa-solid fa-circle-nodes text-3xl mb-2 text-zinc-600"></i>
+          <p class="text-sm font-semibold">No channels configured</p>
+          <p class="text-xs text-zinc-500 mt-0.5">There are no messaging platforms currently connected to this workspace.</p>
+        </div>
+      `;
+
+    // 3. Workspace Detail Master Content
+    this.workspaceDetailContent.innerHTML = `
+      <div class="space-y-8 animate-in fade-in duration-200">
+        <!-- Hero Workspace Banner -->
+        <div class="bento-card rounded-3xl p-6 sm:p-8 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div class="flex items-start gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-[#0d0d10] border border-zinc-800 flex items-center justify-center text-white text-xl shadow-inner shrink-0">
+              <i class="fa-solid fa-briefcase text-emerald-400"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-3">
+                <h1 class="text-2xl font-extrabold text-white tracking-tight">${this._escape(workspace.name || `Workspace #${workspace.id}`)}</h1>
+                <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full border ${isActive ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}">
+                  <span class="w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}"></span>
+                  <span>${isActive ? 'Active' : 'Offline'}</span>
+                </span>
+              </div>
+              <div class="flex flex-wrap items-center gap-3 text-xs text-zinc-400 mt-2 font-mono">
+                <span>Workspace #${workspace.id}</span>
+                <span>·</span>
+                <span class="font-sans text-zinc-300">${serviceType}</span>
+                <span>·</span>
+                <span class="font-semibold text-zinc-300 uppercase">${this._escape(workspace.currencyCode || 'USD')}</span>
+                <span>·</span>
+                <span class="font-sans text-zinc-500">Created ${this._formatTimeAgo(workspace.createdAt)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3 self-start md:self-auto">
+            <button 
+              type="button" 
+              class="select-this-workspace-btn inline-flex items-center gap-2 bg-white hover:bg-zinc-200 text-black px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition transform hover:scale-[1.02] shadow-sm cursor-pointer" 
+              data-workspace-id="${workspace.id}"
+            >
+              <i class="fa-solid fa-check text-xs"></i>
+              <span>Select for Dashboard</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Channels Section -->
+        <div class="space-y-4">
+          <div class="flex items-center justify-between pb-2">
+            <div>
+              <h2 class="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                <i class="fa-solid fa-circle-nodes text-zinc-400 text-sm"></i>
+                <span>Connected Channels</span>
+              </h2>
+              <p class="text-xs text-zinc-400 mt-0.5">Live messaging channels and automated checkout webhooks.</p>
+            </div>
+            <span class="text-xs px-2.5 py-1 rounded-full bg-zinc-800 text-zinc-300 font-mono border border-zinc-700">
+              ${channelsList.length} ${channelsList.length === 1 ? 'Channel' : 'Channels'}
+            </span>
+          </div>
+
+          <!-- Channel Cards Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            ${channelsHtml}
+          </div>
+        </div>
+      </div>
+    `;
+
+    // 4. Attach Event Listeners
+    const wsBreadcrumbBtn = this.workspaceBreadcrumbs.querySelector('[data-target="workspaces"]');
+    if (wsBreadcrumbBtn && onBackToWorkspaces) {
+      wsBreadcrumbBtn.addEventListener('click', () => onBackToWorkspaces());
+    }
+
+    const selectBtn = this.workspaceDetailContent.querySelector('.select-this-workspace-btn');
+    if (selectBtn && onSelectWorkspace) {
+      selectBtn.addEventListener('click', () => onSelectWorkspace(workspace.id));
+    }
+
+    this.workspaceDetailContent.querySelectorAll('.configure-channel-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const channelId = Number(btn.dataset.channelId);
+        if (onConfigureChannel) {
+          onConfigureChannel(channelId);
+        }
+      });
+    });
+  }
+
+  renderChannelConfigView(workspace, channel, { onBackToWorkspaces, onBackToWorkspaceDetail }) {
+    if (!this.workspaceBreadcrumbs || !this.workspaceDetailContent) return;
+
+    const chPlatform = channel.platform || channel.channel || 'webchat';
+    const isChActive = Boolean(channel.isActive);
+
+    // 1. Dynamic Breadcrumbs: Workspaces / [Workspace Name] / [Channel Name]
+    this.workspaceBreadcrumbs.innerHTML = `
+      <button 
+        type="button" 
+        class="breadcrumb-btn text-zinc-400 hover:text-white transition flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-zinc-800/60 cursor-pointer" 
+        data-target="workspaces"
+      >
+        <i class="fa-solid fa-briefcase text-xs"></i>
+        <span>Workspaces</span>
+      </button>
+      <i class="fa-solid fa-chevron-right text-[10px] text-zinc-600"></i>
+      <button 
+        type="button" 
+        class="breadcrumb-btn text-zinc-400 hover:text-white transition flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-zinc-800/60 cursor-pointer" 
+        data-target="workspace-detail"
+      >
+        <span>${this._escape(workspace.name || `Workspace #${workspace.id}`)}</span>
+      </button>
+      <i class="fa-solid fa-chevron-right text-[10px] text-zinc-600"></i>
+      <span class="text-white font-semibold flex items-center gap-2 px-2 py-1 capitalize">
+        ${this._getChannelIcon(chPlatform)}
+        <span>${this._escape(chPlatform)} Channel</span>
+      </span>
+    `;
+
+    // 2. Channel Configuration Panel
+    this.workspaceDetailContent.innerHTML = `
+      <div class="bento-card rounded-3xl p-6 sm:p-8 space-y-6 animate-in fade-in duration-200">
+        <!-- Channel Header -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-zinc-800 gap-4">
+          <div class="flex items-center gap-3.5">
+            <div class="w-12 h-12 rounded-2xl bg-[#0d0d10] border border-zinc-800 flex items-center justify-center text-xl shadow-inner">
+              ${this._getChannelIcon(chPlatform)}
+            </div>
+            <div>
+              <h2 class="text-xl font-bold text-white tracking-tight capitalize flex items-center gap-2">
+                <span>${this._escape(chPlatform)} Channel</span>
+                <span class="text-xs px-2.5 py-0.5 rounded-full border font-normal ${isChActive ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}">
+                  ${isChActive ? 'Active' : 'Offline'}
+                </span>
+              </h2>
+              <p class="text-xs text-zinc-400 mt-0.5">Configuration and live webhook parameters for ${this._escape(workspace.name)}.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Configuration Settings Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div class="bg-[#0d0d10] border border-zinc-800/90 rounded-2xl p-4 space-y-1">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Platform Identifier</span>
+            <div class="text-sm font-semibold text-white capitalize">${this._escape(chPlatform)}</div>
+          </div>
+
+          <div class="bg-[#0d0d10] border border-zinc-800/90 rounded-2xl p-4 space-y-1">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Channel ID</span>
+            <div class="text-sm font-mono text-zinc-300">#${channel.id}</div>
+          </div>
+
+          <div class="bg-[#0d0d10] border border-zinc-800/90 rounded-2xl p-4 space-y-1">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Meta Page ID</span>
+            <div class="text-sm font-mono text-zinc-300">${this._escape(channel.metaPageId || 'None configured')}</div>
+          </div>
+
+          <div class="bg-[#0d0d10] border border-zinc-800/90 rounded-2xl p-4 space-y-1">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Assigned Workspace</span>
+            <div class="text-sm font-semibold text-white">${this._escape(workspace.name)} (ID #${workspace.id})</div>
+          </div>
+        </div>
+
+        <!-- Webhook Route -->
+        <div class="bg-[#0d0d10] border border-zinc-800/90 rounded-2xl p-4 space-y-2">
+          <div class="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+            <span>Incoming Webhook Route</span>
+            <span class="text-emerald-400 text-xs">Live Encrypted</span>
+          </div>
+          <div class="font-mono text-xs text-zinc-300 bg-[#111114] p-3 rounded-xl border border-zinc-800 select-all overflow-x-auto">
+            ${CONFIG.API_BASE_URL}/webhooks/${encodeURIComponent(chPlatform)}/${channel.id}
+          </div>
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="pt-4 border-t border-zinc-800 flex items-center justify-between">
+          <button 
+            type="button" 
+            class="back-to-channels-btn inline-flex items-center gap-2 border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer"
+          >
+            <i class="fa-solid fa-arrow-left text-xs"></i>
+            <span>Back to ${this._escape(workspace.name)}</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    // Breadcrumb buttons event listeners
+    const wsBreadcrumbBtn = this.workspaceBreadcrumbs.querySelector('[data-target="workspaces"]');
+    if (wsBreadcrumbBtn && onBackToWorkspaces) {
+      wsBreadcrumbBtn.addEventListener('click', () => onBackToWorkspaces());
+    }
+
+    const wsDetailBreadcrumbBtn = this.workspaceBreadcrumbs.querySelector('[data-target="workspace-detail"]');
+    if (wsDetailBreadcrumbBtn && onBackToWorkspaceDetail) {
+      wsDetailBreadcrumbBtn.addEventListener('click', () => onBackToWorkspaceDetail());
+    }
+
+    const backBtn = this.workspaceDetailContent.querySelector('.back-to-channels-btn');
+    if (backBtn && onBackToWorkspaceDetail) {
+      backBtn.addEventListener('click', () => onBackToWorkspaceDetail());
+    }
   }
 
   renderWorkspacesCardsError(errorMessage, onRetry = null) {

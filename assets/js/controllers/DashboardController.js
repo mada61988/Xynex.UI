@@ -307,15 +307,21 @@ export class DashboardController {
 
       try {
         const workspaces = await this.model.fetchAllWorkspaces();
-        this.view.renderWorkspacesCards(workspaces, async (selectedId) => {
-          const overviewLink = document.querySelector('a[href="#overview"]');
-          if (overviewLink) {
-            overviewLink.click();
-          } else {
-            this.view.showSection('overview');
+        this.view.renderWorkspacesCards(
+          workspaces, 
+          async (selectedId) => {
+            const overviewLink = document.querySelector('a[href="#overview"]');
+            if (overviewLink) {
+              overviewLink.click();
+            } else {
+              this.view.showSection('overview');
+            }
+            await this.handleWorkspaceSelection(selectedId);
+          },
+          async (workspaceId) => {
+            await this.openWorkspaceDetail(workspaceId);
           }
-          await this.handleWorkspaceSelection(selectedId);
-        });
+        );
       } catch (err) {
         console.error("DashboardController: Error fetching workspaces:", err);
         const serverMessage = err.serverMessage || err.message || "Failed to communicate with server.";
@@ -325,6 +331,65 @@ export class DashboardController {
       // Default to overview section
       this.view.showSection('overview');
     }
+  }
+
+  async openWorkspaceDetail(workspaceId) {
+    this.view.showPageLoading("Loading workspace details...");
+    try {
+      let workspaces = this.model.cachedUserWorkspaces?.workspaces;
+      if (!workspaces || workspaces.length === 0) {
+        workspaces = await this.model.fetchAllWorkspaces();
+      }
+      const workspace = (workspaces || []).find(w => String(w.id) === String(workspaceId)) || {
+        id: workspaceId,
+        name: `Workspace #${workspaceId}`,
+        status: 'active'
+      };
+
+      let channels = [];
+      try {
+        const channelData = await this.model.fetchWorkspaceChannels(workspaceId);
+        channels = channelData?.channels || (Array.isArray(channelData) ? channelData : (workspace.channels || []));
+      } catch (e) {
+        console.warn("Could not fetch workspace channels directly, using embedded channels:", e);
+        channels = workspace.channels || [];
+      }
+
+      this.view.showSection('workspace-detail');
+      this.view.renderWorkspaceDetailView(workspace, channels, {
+        onBackToWorkspaces: () => {
+          this.handleNavigation('workspaces');
+        },
+        onConfigureChannel: (channelId) => {
+          const channel = (channels || []).find(c => Number(c.id) === Number(channelId)) || {
+            id: channelId,
+            platform: 'channel',
+            isActive: true
+          };
+          this.openChannelConfig(workspace, channel, channels);
+        },
+        onSelectWorkspace: async (wsId) => {
+          const overviewLink = document.querySelector('a[href="#overview"]');
+          if (overviewLink) overviewLink.click();
+          await this.handleWorkspaceSelection(wsId);
+        }
+      });
+    } catch (err) {
+      console.error("DashboardController: Error opening workspace detail:", err);
+    } finally {
+      this.view.hidePageLoading();
+    }
+  }
+
+  openChannelConfig(workspace, channel, allChannels) {
+    this.view.renderChannelConfigView(workspace, channel, {
+      onBackToWorkspaces: () => {
+        this.handleNavigation('workspaces');
+      },
+      onBackToWorkspaceDetail: () => {
+        this.openWorkspaceDetail(workspace.id);
+      }
+    });
   }
 
   async handleEditRole(userId, currentRole) {

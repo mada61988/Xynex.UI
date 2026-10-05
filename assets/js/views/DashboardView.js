@@ -1469,6 +1469,15 @@ export class DashboardView {
     }
   }
 
+  _getInitials(name) {
+    if (!name) return 'WS';
+    const parts = name.trim().split(/[\s._-]+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  }
+
   renderWorkspacesCards(workspaces, onSelectWorkspace = null, onOpenDetail = null) {
     if (!this.workspacesCardsContainer) return;
 

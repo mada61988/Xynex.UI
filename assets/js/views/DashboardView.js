@@ -1591,7 +1591,9 @@ export class DashboardView {
             <div class="bento-card rounded-3xl p-6 flex flex-col justify-between min-h-[190px]">
               <div class="flex justify-between items-start mb-6">
                 <div class="flex items-center gap-4">
-                  ${this._getInspirationChannelIcon(chPlatform)}
+                  <div class="w-12 h-12 rounded-2xl bg-[#0d0d10] border border-zinc-800 flex items-center justify-center text-xl shadow-inner shrink-0">
+                    ${this._getChannelIcon(chPlatform)}
+                  </div>
                   <div>
                     <h3 class="font-bold text-white text-base capitalize">${this._escape(chPlatform)}</h3>
                     <div class="text-[11px] font-mono text-zinc-500 mt-0.5">ID: ${this._escape(c.metaPageId || c.id)}</div>

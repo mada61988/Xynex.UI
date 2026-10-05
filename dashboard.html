@@ -189,6 +189,11 @@
             </div>
           </div>
         </div>
+
+        <!-- Dynamic Header Breadcrumbs (Visible on all tabs EXCEPT Overview) -->
+        <nav id="navbar-breadcrumbs-container" aria-label="Breadcrumb" class="hidden items-center gap-2 text-xs sm:text-sm font-medium text-zinc-400">
+          <!-- Injected dynamically by DashboardView -->
+        </nav>
       </div>
 
       <!-- Right Header Actions -->
@@ -200,15 +205,15 @@
         </div>
 
         <!-- Deploy Bot Primary Action -->
-        <button type="button" class="inline-flex items-center gap-2 bg-white hover:bg-zinc-200 text-black px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition transform hover:scale-[1.02] shadow-sm">
+        <!-- <button type="button" class="inline-flex items-center gap-2 bg-white hover:bg-zinc-200 text-black px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition transform hover:scale-[1.02] shadow-sm">
           <i class="fa-solid fa-plus text-xs"></i>
           <span class="hidden sm:inline">Deploy Bot</span>
           <span class="sm:hidden">Deploy</span>
-        </button>
+        </button> -->
 
         <!-- Clerk User Button -->
         <div id="user-button" class="ml-1 w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 border border-zinc-700">
-          <i class="fa-regular fa-user text-xs text-zinc-400"></i>
+          <!-- <i class="fa-regular fa-user text-xs text-zinc-400"></i> -->
         </div>
       </div>
     </header>

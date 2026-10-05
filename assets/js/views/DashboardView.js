@@ -33,6 +33,8 @@ export class DashboardView {
     this.workspaceDetailSection = document.getElementById('section-workspace-detail');
     this.workspaceBreadcrumbs = document.getElementById('workspace-breadcrumbs');
     this.workspaceDetailContent = document.getElementById('workspace-detail-content');
+    this.navbarBreadcrumbsContainer = document.getElementById('navbar-breadcrumbs-container');
+    this.onBreadcrumbNavigate = null;
 
     // Callbacks for role editing
     this.onEditRoleClick = null;
@@ -185,12 +187,19 @@ export class DashboardView {
 
     if (sectionName === 'users') {
       if (this.usersSection) this.usersSection.classList.remove('hidden');
+      this.renderHeaderBreadcrumbs([
+        { label: 'Users Directory', icon: '<i class="fa-solid fa-user text-xs text-zinc-400"></i>' }
+      ]);
     } else if (sectionName === 'workspaces' || sectionName === 'chatbots') {
       if (this.workspacesSection) this.workspacesSection.classList.remove('hidden');
+      this.renderHeaderBreadcrumbs([
+        { label: 'Workspaces', icon: '<i class="fa-solid fa-layer-group text-xs text-zinc-400"></i>' }
+      ]);
     } else if (sectionName === 'workspace-detail') {
       if (this.workspaceDetailSection) this.workspaceDetailSection.classList.remove('hidden');
     } else {
       if (this.overviewSection) this.overviewSection.classList.remove('hidden');
+      this.renderHeaderBreadcrumbs([]);
     }
 
     // Workspaces dropdown menu is visible on the overview tab only
@@ -205,7 +214,73 @@ export class DashboardView {
       }
     }
 
+    // Header breadcrumbs container is visible on all tabs EXCEPT Overview
+    const breadcrumbNav = this.navbarBreadcrumbsContainer || document.getElementById('navbar-breadcrumbs-container');
+    if (breadcrumbNav) {
+      if (isOverview) {
+        breadcrumbNav.classList.add('hidden');
+        breadcrumbNav.classList.remove('flex');
+      } else {
+        breadcrumbNav.classList.remove('hidden');
+        breadcrumbNav.classList.add('flex');
+      }
+    }
+
     this.setActiveSidebarLink(sectionName === 'workspace-detail' ? 'workspaces' : sectionName);
+  }
+
+  renderHeaderBreadcrumbs(items = []) {
+    const container = this.navbarBreadcrumbsContainer || document.getElementById('navbar-breadcrumbs-container');
+    if (!container) return;
+
+    if (!items || items.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+
+    const html = items.map((item, idx) => {
+      const isFirst = idx === 0;
+
+      let itemHtml = '';
+      if (item.action || item.target) {
+        itemHtml = `
+          <button 
+            type="button" 
+            class="header-breadcrumb-btn hover:text-white transition flex items-center gap-1.5 cursor-pointer text-zinc-400"
+            data-target="${this._escape(item.target || item.action)}"
+            ${item.workspaceId ? `data-workspace-id="${this._escape(item.workspaceId)}"` : ''}
+          >
+            ${item.icon ? item.icon : (isFirst ? '<i class="fa-solid fa-layer-group text-xs text-zinc-400"></i>' : '')}
+            <span>${this._escape(item.label)}</span>
+          </button>
+        `;
+      } else {
+        itemHtml = `
+          <span class="text-white font-semibold flex items-center gap-1.5">
+            ${item.icon ? item.icon : ''}
+            <span>${this._escape(item.label)}</span>
+          </span>
+        `;
+      }
+
+      return `
+        ${idx > 0 ? '<i class="fa-solid fa-chevron-right text-[10px] text-zinc-600"></i>' : ''}
+        ${itemHtml}
+      `;
+    }).join('');
+
+    container.innerHTML = html;
+
+    // Attach click events on header breadcrumb buttons
+    container.querySelectorAll('.header-breadcrumb-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.dataset.target;
+        const wsId = btn.dataset.workspaceId;
+        if (this.onBreadcrumbNavigate) {
+          this.onBreadcrumbNavigate(target, wsId);
+        }
+      });
+    });
   }
 
   renderMetrics(metrics) {
@@ -1434,57 +1509,31 @@ export class DashboardView {
         : `<span class="text-xs text-zinc-500 italic">No channels linked</span>`;
 
       return `
-        <div class="bento-card rounded-3xl p-6 sm:p-7 relative overflow-hidden flex flex-col justify-between group transition-all duration-300 hover:border-zinc-700 hover:shadow-2xl hover:shadow-black/60">
-          <div class="absolute -top-16 -right-16 w-36 h-36 ${isActive ? 'bg-emerald-500/10' : 'bg-zinc-700/5'} rounded-full blur-2xl pointer-events-none"></div>
-
+        <div class="bento-card rounded-3xl p-6 flex flex-col justify-between h-[220px]">
           <div>
-            <!-- Header: Icon & Status -->
-            <div class="flex items-start justify-between gap-3 mb-4">
-              <div class="w-12 h-12 rounded-2xl bg-[#0d0d10] border border-zinc-800 flex items-center justify-center text-white font-bold text-lg shadow-sm shrink-0">
-                <i class="fa-solid fa-briefcase text-base ${isActive ? 'text-white' : 'text-zinc-500'}"></i>
+            <div class="flex justify-between items-start mb-4">
+              <div class="w-12 h-12 bg-zinc-800 rounded-xl flex items-center justify-center border border-zinc-700 text-white font-bold text-lg">
+                ${this._getInitials(ws.name)}
               </div>
-              <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${isActive ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}">
-                <span class="w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}"></span>
-                <span>${isActive ? 'Active' : 'Offline'}</span>
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${isActive ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-zinc-800 border border-zinc-700 text-zinc-400'} text-[10px] font-bold uppercase tracking-wider">
+                ${isActive ? '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Active' : 'Offline'}
               </span>
             </div>
-
-            <!-- Title & Meta -->
-            <div class="mb-5">
-              <h3 class="text-lg font-bold text-white tracking-tight leading-snug group-hover:text-emerald-400 transition-colors">
-                ${this._escape(ws.name || `Workspace #${ws.id}`)}
-              </h3>
-              <div class="flex items-center gap-2 text-xs text-zinc-400 mt-1 font-mono">
-                <span>#${ws.id}</span>
-                <span>·</span>
-                <span class="font-sans text-zinc-300">${serviceTypeFormatted}</span>
-                <span>·</span>
-                <span class="uppercase font-semibold text-zinc-300">${this._escape(ws.currencyCode || 'USD')}</span>
-              </div>
-            </div>
-
-            <!-- Connected Channels Box -->
-            <div class="bg-[#0d0d10] border border-zinc-800/80 rounded-2xl p-4 mb-5 space-y-2">
-              <div class="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-zinc-500">
-                <span>Integrated Channels</span>
-                <span class="font-mono text-zinc-400">${channels.length} Total</span>
-              </div>
-              <div class="flex flex-wrap gap-1.5 pt-1">
-                ${channelPills}
-              </div>
-            </div>
+            <h2 class="text-xl font-bold text-white tracking-tight truncate" title="${this._escape(ws.name || `Workspace #${ws.id}`)}">
+              ${this._escape(ws.name || `Workspace #${ws.id}`)}
+            </h2>
+            <p class="text-xs text-zinc-400 mt-1 capitalize">${this._escape(ws.serviceType || 'product_based')}</p>
           </div>
-
-          <!-- Footer Action -->
-          <div class="pt-4 border-t border-zinc-800/70 flex items-center justify-between text-xs">
-            <span class="text-zinc-500 text-[11px]">${this._formatTimeAgo(ws.createdAt)}</span>
+          <div class="flex items-center justify-between border-t border-zinc-800 pt-4 mt-4">
+            <div class="flex items-center gap-2 text-xs text-zinc-400 font-medium">
+              <i class="fa-solid fa-circle-nodes"></i> ${(ws.channels || []).length} Channels
+            </div>
             <button 
               type="button" 
-              class="manage-workspace-btn inline-flex items-center gap-2 bg-white hover:bg-zinc-200 text-black px-4 py-2 rounded-xl font-semibold text-xs transition transform hover:scale-[1.02] shadow-sm cursor-pointer"
+              class="manage-workspace-btn text-xs font-semibold bg-white text-black px-4 py-2 rounded-lg transition hover:bg-zinc-200 cursor-pointer shadow-sm"
               data-workspace-id="${ws.id}"
             >
-              <i class="fa-solid fa-sliders text-xs"></i>
-              <span>Manage</span>
+              Manage <i class="fa-solid fa-arrow-right ml-1 text-[10px]"></i>
             </button>
           </div>
         </div>
@@ -1512,89 +1561,44 @@ export class DashboardView {
     });
   }
 
-  renderWorkspaceDetailView(workspace, channels, { onBackToWorkspaces, onToggleChannelStatus }) {
-    if (!this.workspaceBreadcrumbs || !this.workspaceDetailContent) return;
+  renderWorkspaceDetailView(workspace, channels, { onBackToWorkspaces, onConfigureChannel }) {
+    if (!this.workspaceDetailContent) return;
 
     const isActive = String(workspace.status || '').toLowerCase() === 'active';
     const channelsList = Array.isArray(channels) ? channels : [];
-    const activeChannels = channelsList.filter(c => Boolean(c.isActive)).length;
-    const percentage = channelsList.length > 0 ? Math.round((activeChannels / channelsList.length) * 100) : 0;
-    const serviceType = (workspace.serviceType || 'product_based').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
-    // 1. Dynamic Breadcrumbs At The Top Left: Workspaces / [Workspace Name]
-    this.workspaceBreadcrumbs.innerHTML = `
-      <div class="flex items-center gap-2 text-xs sm:text-sm font-medium">
-        <button 
-          type="button" 
-          class="breadcrumb-btn text-zinc-400 hover:text-white transition flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#111114] border border-zinc-800 hover:border-zinc-700 cursor-pointer shadow-sm" 
-          data-target="workspaces"
-        >
-          <i class="fa-solid fa-briefcase text-xs text-zinc-400"></i>
-          <span>Workspaces</span>
-        </button>
-        <i class="fa-solid fa-chevron-right text-[10px] text-zinc-600"></i>
-        <span class="text-white font-semibold flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-[#111114] border border-zinc-800 shadow-sm">
-          <span class="w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}"></span>
-          <span>${this._escape(workspace.name || `Workspace #${workspace.id}`)}</span>
-        </span>
-      </div>
-    `;
+    // 1. Dynamic Breadcrumbs In Top Header: Workspaces / [Workspace Name]
+    this.renderHeaderBreadcrumbs([
+      { label: 'Workspaces', target: 'workspaces', action: 'workspaces', icon: '<i class="fa-solid fa-layer-group text-xs text-zinc-400"></i>' },
+      { label: workspace.name || `Workspace #${workspace.id}` }
+    ]);
 
-    // 2. Channels Cards HTML
+    // 2. Channels Cards HTML following UiUxInspiration/workspaces.html
     const channelsHtml = channelsList.length > 0
       ? channelsList.map(c => {
           const chPlatform = c.platform || c.channel || 'webchat';
           const isChActive = Boolean(c.isActive);
           return `
-            <div class="bento-card rounded-2xl p-5 relative overflow-hidden flex flex-col justify-between group hover:border-zinc-700 transition duration-200">
-              <div>
-                <div class="flex items-start justify-between gap-3 mb-3">
-                  <div class="w-10 h-10 rounded-xl bg-[#0d0d10] border border-zinc-800 flex items-center justify-center text-lg shrink-0">
-                    ${this._getChannelIcon(chPlatform)}
+            <div class="bento-card rounded-3xl p-6 flex flex-col justify-between min-h-[190px]">
+              <div class="flex justify-between items-start mb-6">
+                <div class="flex items-center gap-4">
+                  ${this._getInspirationChannelIcon(chPlatform)}
+                  <div>
+                    <h3 class="font-bold text-white text-base capitalize">${this._escape(chPlatform)}</h3>
+                    <div class="text-[11px] font-mono text-zinc-500 mt-0.5">ID: ${this._escape(c.metaPageId || c.id)}</div>
                   </div>
-                  <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${isChActive ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}">
-                    <span class="w-1.5 h-1.5 rounded-full ${isChActive ? 'bg-emerald-400' : 'bg-zinc-500'}"></span>
-                    <span>${isChActive ? 'Active' : 'Offline'}</span>
-                  </span>
                 </div>
-
-                <h4 class="text-base font-bold text-white tracking-tight capitalize mb-1">${this._escape(chPlatform)}</h4>
-                <div class="space-y-1 text-xs text-zinc-400 font-mono mb-4">
-                  <div>Channel ID: #${c.id}</div>
-                  ${c.metaPageId ? `<div class="truncate text-[11px] text-zinc-500">Meta ID: ${this._escape(c.metaPageId)}</div>` : ''}
-                </div>
+                <span class="text-[10px] font-bold ${isChActive ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-zinc-800 text-zinc-400 border border-zinc-700'} px-2 py-1 rounded-md uppercase">
+                  ${isChActive ? 'Active' : 'Offline'}
+                </span>
               </div>
-
-              <div class="pt-4 border-t border-zinc-800/70 flex items-center justify-between">
-                <div class="flex flex-col">
-                  <span class="text-xs font-semibold text-white">Channel Status</span>
-                  <span class="text-[10px] text-zinc-500" id="channel-toggle-subtext-${c.id}">${isChActive ? 'Traffic enabled' : 'Traffic paused'}</span>
-                </div>
-
-                <div class="flex items-center gap-2">
-                  <button 
-                    type="button" 
-                    role="switch" 
-                    aria-checked="${isChActive ? 'true' : 'false'}" 
-                    id="channel-toggle-${c.id}" 
-                    data-channel-id="${c.id}" 
-                    data-active="${isChActive ? 'true' : 'false'}" 
-                    class="channel-toggle-btn relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isChActive ? 'bg-emerald-500' : 'bg-zinc-700'}"
-                    title="${isChActive ? 'Click to deactivate channel' : 'Click to activate channel'}"
-                  >
-                    <span class="sr-only">Toggle ${chPlatform} channel</span>
-                    <span 
-                      id="channel-toggle-thumb-${c.id}" 
-                      class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${isChActive ? 'translate-x-5' : 'translate-x-0'} flex items-center justify-center"
-                    >
-                      <svg id="channel-toggle-spinner-${c.id}" class="hidden animate-spin h-3 w-3 text-zinc-800" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                    </span>
-                  </button>
-                </div>
-              </div>
+              <button 
+                type="button" 
+                class="configure-channel-btn w-full text-center bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-semibold py-2.5 rounded-xl transition cursor-pointer"
+                data-channel-id="${c.id}"
+              >
+                Configure Channel <i class="fa-solid fa-gear ml-1"></i>
+              </button>
             </div>
           `;
         }).join('')
@@ -1606,87 +1610,34 @@ export class DashboardView {
         </div>
       `;
 
-    // 3. Workspace Detail Master Content
+    // 3. Workspace Detail Master Content following UiUxInspiration/workspaces.html
     this.workspaceDetailContent.innerHTML = `
       <div class="space-y-8 animate-in fade-in duration-200">
-        <!-- Hero Workspace Banner -->
-        <div class="bento-card rounded-3xl p-6 sm:p-8 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div class="flex items-start gap-4">
-            <div class="w-14 h-14 rounded-2xl bg-[#0d0d10] border border-zinc-800 flex items-center justify-center text-white text-xl shadow-inner shrink-0">
-              <i class="fa-solid fa-briefcase text-emerald-400"></i>
-            </div>
-            <div>
-              <div class="flex items-center gap-3">
-                <h1 class="text-2xl font-extrabold text-white tracking-tight">${this._escape(workspace.name || `Workspace #${workspace.id}`)}</h1>
-                <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full border ${isActive ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}">
-                  <span class="w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}"></span>
-                  <span>${isActive ? 'Active' : 'Offline'}</span>
-                </span>
-              </div>
-              <div class="flex flex-wrap items-center gap-3 text-xs text-zinc-400 mt-2 font-mono">
-                <span>Workspace #${workspace.id}</span>
-                <span>·</span>
-                <span class="font-sans text-zinc-300">${serviceType}</span>
-                <span>·</span>
-                <span class="font-semibold text-zinc-300 uppercase">${this._escape(workspace.currencyCode || 'USD')}</span>
-                <span>·</span>
-                <span class="font-sans text-zinc-500">Created ${this._formatTimeAgo(workspace.createdAt)}</span>
-              </div>
-            </div>
+        <!-- Header -->
+        <div class="flex items-center justify-between">
+          <div>
+            <h1 class="text-3xl font-extrabold tracking-tight text-white mb-1">${this._escape(workspace.name || `Workspace #${workspace.id}`)} Channels</h1>
+            <p class="text-sm text-zinc-400">Manage integrations and deployment status for this workspace.</p>
           </div>
-
-          <div class="flex items-center gap-3 self-start md:self-auto">
-            <button 
-              type="button" 
-              class="select-this-workspace-btn inline-flex items-center gap-2 bg-white hover:bg-zinc-200 text-black px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition transform hover:scale-[1.02] shadow-sm cursor-pointer" 
-              data-workspace-id="${workspace.id}"
-            >
-              <i class="fa-solid fa-check text-xs"></i>
-              <span>Select for Dashboard</span>
-            </button>
-          </div>
+          <span class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#111114] border border-zinc-800 text-xs text-zinc-300 font-medium shadow-sm">
+            <span class="w-2 h-2 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}"></span>
+            <span>${isActive ? 'Active Workspace' : 'Offline Workspace'}</span>
+          </span>
         </div>
 
-        <!-- Channels Section -->
-        <div class="space-y-4">
-          <div class="flex items-center justify-between pb-2">
-            <div>
-              <h2 class="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-                <i class="fa-solid fa-circle-nodes text-zinc-400 text-sm"></i>
-                <span>Connected Channels</span>
-              </h2>
-              <p class="text-xs text-zinc-400 mt-0.5">Live messaging channels and automated checkout webhooks.</p>
-            </div>
-            <span class="text-xs px-2.5 py-1 rounded-full bg-zinc-800 text-zinc-300 font-mono border border-zinc-700">
-              ${channelsList.length} ${channelsList.length === 1 ? 'Channel' : 'Channels'}
-            </span>
-          </div>
-
-          <!-- Channel Cards Grid -->
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            ${channelsHtml}
-          </div>
+        <!-- Channels Grid (2 Columns as in workspaces.html inspiration) -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          ${channelsHtml}
         </div>
       </div>
     `;
 
     // 4. Attach Event Listeners
-    const wsBreadcrumbBtn = this.workspaceBreadcrumbs.querySelector('[data-target="workspaces"]');
-    if (wsBreadcrumbBtn && onBackToWorkspaces) {
-      wsBreadcrumbBtn.addEventListener('click', () => onBackToWorkspaces());
-    }
-
-    const selectBtn = this.workspaceDetailContent.querySelector('.select-this-workspace-btn');
-    if (selectBtn && onSelectWorkspace) {
-      selectBtn.addEventListener('click', () => onSelectWorkspace(workspace.id));
-    }
-
-    this.workspaceDetailContent.querySelectorAll('.channel-toggle-btn').forEach(btn => {
+    this.workspaceDetailContent.querySelectorAll('.configure-channel-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const channelId = Number(btn.dataset.channelId);
-        const currentActive = btn.dataset.active === 'true';
-        if (onToggleChannelStatus) {
-          onToggleChannelStatus(channelId, currentActive);
+        if (onConfigureChannel) {
+          onConfigureChannel(channelId);
         }
       });
     });
@@ -1757,117 +1708,124 @@ export class DashboardView {
     }
   }
 
-  renderChannelConfigView(workspace, channel, { onBackToWorkspaces, onBackToWorkspaceDetail }) {
-    if (!this.workspaceBreadcrumbs || !this.workspaceDetailContent) return;
+  renderChannelConfigView(workspace, channel, { onBackToWorkspaces, onBackToWorkspaceDetail, onToggleStatus }) {
+    if (!this.workspaceDetailContent) return;
 
     const chPlatform = channel.platform || channel.channel || 'webchat';
     const isChActive = Boolean(channel.isActive);
 
-    // 1. Dynamic Breadcrumbs: Workspaces / [Workspace Name] / [Channel Name]
-    this.workspaceBreadcrumbs.innerHTML = `
-      <button 
-        type="button" 
-        class="breadcrumb-btn text-zinc-400 hover:text-white transition flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-zinc-800/60 cursor-pointer" 
-        data-target="workspaces"
-      >
-        <i class="fa-solid fa-briefcase text-xs"></i>
-        <span>Workspaces</span>
-      </button>
-      <i class="fa-solid fa-chevron-right text-[10px] text-zinc-600"></i>
-      <button 
-        type="button" 
-        class="breadcrumb-btn text-zinc-400 hover:text-white transition flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-zinc-800/60 cursor-pointer" 
-        data-target="workspace-detail"
-      >
-        <span>${this._escape(workspace.name || `Workspace #${workspace.id}`)}</span>
-      </button>
-      <i class="fa-solid fa-chevron-right text-[10px] text-zinc-600"></i>
-      <span class="text-white font-semibold flex items-center gap-2 px-2 py-1 capitalize">
-        ${this._getChannelIcon(chPlatform)}
-        <span>${this._escape(chPlatform)} Channel</span>
-      </span>
-    `;
+    // 1. Dynamic Breadcrumbs In Top Header: Workspaces / [Workspace Name] / [Channel Name] Settings
+    this.renderHeaderBreadcrumbs([
+      { label: 'Workspaces', target: 'workspaces', action: 'workspaces', icon: '<i class="fa-solid fa-layer-group text-xs text-zinc-400"></i>' },
+      { label: workspace.name || `Workspace #${workspace.id}`, target: 'workspace-detail', action: 'workspace-detail', workspaceId: workspace.id },
+      { label: `${this._escape(chPlatform)} Settings`, icon: `<i class="fa-brands fa-${this._escape(chPlatform)}"></i>` }
+    ]);
 
-    // 2. Channel Configuration Panel
+    // 2. Channel Configuration Panel following UiUxInspiration/workspaces.html
     this.workspaceDetailContent.innerHTML = `
-      <div class="bento-card rounded-3xl p-6 sm:p-8 space-y-6 animate-in fade-in duration-200">
-        <!-- Channel Header -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-zinc-800 gap-4">
-          <div class="flex items-center gap-3.5">
-            <div class="w-12 h-12 rounded-2xl bg-[#0d0d10] border border-zinc-800 flex items-center justify-center text-xl shadow-inner">
-              ${this._getChannelIcon(chPlatform)}
-            </div>
-            <div>
-              <h2 class="text-xl font-bold text-white tracking-tight capitalize flex items-center gap-2">
-                <span>${this._escape(chPlatform)} Channel</span>
-                <span class="text-xs px-2.5 py-0.5 rounded-full border font-normal ${isChActive ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}">
-                  ${isChActive ? 'Active' : 'Offline'}
+      <div class="space-y-8 animate-in fade-in duration-200">
+        <div class="max-w-3xl">
+          <div class="bento-card rounded-3xl overflow-hidden">
+            
+            <!-- Config Header & Master Toggle (Triggers PATCH /channels/:id/status) -->
+            <div class="p-6 sm:p-8 border-b border-zinc-800 bg-[#0d0d10] flex items-center justify-between">
+              <div>
+                <h2 class="text-xl font-bold text-white tracking-tight capitalize flex items-center gap-2">
+                  ${this._getChannelIcon(chPlatform)}
+                  <span>${this._escape(chPlatform)} Configuration</span>
+                </h2>
+                <p class="text-xs text-zinc-400 mt-1">Manage API credentials and webhook routing for this integration.</p>
+              </div>
+
+              <!-- THE MASTER TOGGLE (Triggers PATCH /channels/:id/status) -->
+              <div class="flex flex-col items-end gap-2">
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    id="channel-master-toggle" 
+                    data-channel-id="${channel.id}" 
+                    data-active="${isChActive ? 'true' : 'false'}" 
+                    class="sr-only peer" 
+                    ${isChActive ? 'checked' : ''}
+                  >
+                  <div class="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                </label>
+                <span id="channel-master-status-label" class="text-[10px] font-semibold ${isChActive ? 'text-emerald-400' : 'text-zinc-500'} tracking-wide uppercase">
+                  ${isChActive ? 'Agent Active' : 'Agent Offline'}
                 </span>
-              </h2>
-              <p class="text-xs text-zinc-400 mt-0.5">Configuration and live webhook parameters for ${this._escape(workspace.name)}.</p>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <!-- Configuration Settings Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div class="bg-[#0d0d10] border border-zinc-800/90 rounded-2xl p-4 space-y-1">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Platform Identifier</span>
-            <div class="text-sm font-semibold text-white capitalize">${this._escape(chPlatform)}</div>
-          </div>
+            <!-- Form Fields -->
+            <div class="p-6 sm:p-8 space-y-6">
+              <!-- Platform & Channel ID -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-zinc-300 mb-2">Platform</label>
+                  <input type="text" readonly value="${this._escape(chPlatform)}" class="w-full bg-[#0d0d10] border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white font-mono capitalize">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-zinc-300 mb-2">Channel ID</label>
+                  <input type="text" readonly value="${channel.id}" class="w-full bg-[#0d0d10] border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white font-mono">
+                </div>
+              </div>
 
-          <div class="bg-[#0d0d10] border border-zinc-800/90 rounded-2xl p-4 space-y-1">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Channel ID</span>
-            <div class="text-sm font-mono text-zinc-300">#${channel.id}</div>
-          </div>
+              <!-- Meta Page ID -->
+              <div>
+                <label class="block text-xs font-semibold text-zinc-300 mb-2">Meta Page ID</label>
+                <input type="text" readonly value="${this._escape(channel.metaPageId || 'N/A')}" class="w-full bg-[#0d0d10] border border-zinc-700 focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 rounded-xl px-4 py-2.5 text-sm text-white font-mono transition">
+                <p class="text-[10px] text-zinc-500 mt-1.5">The numeric ID of your connected Facebook/Instagram page.</p>
+              </div>
 
-          <div class="bg-[#0d0d10] border border-zinc-800/90 rounded-2xl p-4 space-y-1">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Meta Page ID</span>
-            <div class="text-sm font-mono text-zinc-300">${this._escape(channel.metaPageId || 'None configured')}</div>
+              <!-- Webhook Route -->
+              <div>
+                <label class="block text-xs font-semibold text-zinc-300 mb-2">Incoming Webhook Route</label>
+                <input type="text" readonly value="${CONFIG.API_BASE_URL}/webhooks/${encodeURIComponent(chPlatform)}/${channel.id}" class="w-full bg-[#0d0d10] border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-zinc-400 font-mono select-all">
+                <p class="text-[10px] text-zinc-500 mt-1.5">Meta Graph API events are securely forwarded to this endpoint.</p>
+              </div>
+              
+              <!-- Actions -->
+              <div class="pt-4 flex items-center justify-end gap-3">
+                <button type="button" id="back-to-channels-list-btn" class="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white transition cursor-pointer">
+                  Back to ${this._escape(workspace.name || 'Workspace')}
+                </button>
+              </div>
+            </div>
+            
           </div>
-
-          <div class="bg-[#0d0d10] border border-zinc-800/90 rounded-2xl p-4 space-y-1">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Assigned Workspace</span>
-            <div class="text-sm font-semibold text-white">${this._escape(workspace.name)} (ID #${workspace.id})</div>
-          </div>
-        </div>
-
-        <!-- Webhook Route -->
-        <div class="bg-[#0d0d10] border border-zinc-800/90 rounded-2xl p-4 space-y-2">
-          <div class="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-zinc-500">
-            <span>Incoming Webhook Route</span>
-            <span class="text-emerald-400 text-xs">Live Encrypted</span>
-          </div>
-          <div class="font-mono text-xs text-zinc-300 bg-[#111114] p-3 rounded-xl border border-zinc-800 select-all overflow-x-auto">
-            ${CONFIG.API_BASE_URL}/webhooks/${encodeURIComponent(chPlatform)}/${channel.id}
-          </div>
-        </div>
-
-        <!-- Footer Actions -->
-        <div class="pt-4 border-t border-zinc-800 flex items-center justify-between">
-          <button 
-            type="button" 
-            class="back-to-channels-btn inline-flex items-center gap-2 border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer"
-          >
-            <i class="fa-solid fa-arrow-left text-xs"></i>
-            <span>Back to ${this._escape(workspace.name)}</span>
-          </button>
         </div>
       </div>
     `;
 
-    // Breadcrumb buttons event listeners
-    const wsBreadcrumbBtn = this.workspaceBreadcrumbs.querySelector('[data-target="workspaces"]');
-    if (wsBreadcrumbBtn && onBackToWorkspaces) {
-      wsBreadcrumbBtn.addEventListener('click', () => onBackToWorkspaces());
+    // 3. Attach Event Listeners
+    const toggle = document.getElementById('channel-master-toggle');
+    const statusLabel = document.getElementById('channel-master-status-label');
+    if (toggle) {
+      toggle.addEventListener('change', async () => {
+        const isCurrentlyActive = toggle.dataset.active === 'true';
+        const targetActive = !isCurrentlyActive;
+        toggle.disabled = true;
+
+        try {
+          if (onToggleStatus) {
+            await onToggleStatus(channel.id, targetActive);
+          }
+          toggle.checked = targetActive;
+          toggle.dataset.active = targetActive ? 'true' : 'false';
+          if (statusLabel) {
+            statusLabel.className = `text-[10px] font-semibold ${targetActive ? 'text-emerald-400' : 'text-zinc-500'} tracking-wide uppercase`;
+            statusLabel.textContent = targetActive ? 'Agent Active' : 'Agent Offline';
+          }
+        } catch (err) {
+          console.error("Failed to update channel status:", err);
+          toggle.checked = isCurrentlyActive;
+        } finally {
+          toggle.disabled = false;
+        }
+      });
     }
 
-    const wsDetailBreadcrumbBtn = this.workspaceBreadcrumbs.querySelector('[data-target="workspace-detail"]');
-    if (wsDetailBreadcrumbBtn && onBackToWorkspaceDetail) {
-      wsDetailBreadcrumbBtn.addEventListener('click', () => onBackToWorkspaceDetail());
-    }
-
-    const backBtn = this.workspaceDetailContent.querySelector('.back-to-channels-btn');
+    const backBtn = document.getElementById('back-to-channels-list-btn');
     if (backBtn && onBackToWorkspaceDetail) {
       backBtn.addEventListener('click', () => onBackToWorkspaceDetail());
     }

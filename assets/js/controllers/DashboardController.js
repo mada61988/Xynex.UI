@@ -24,6 +24,15 @@ export class DashboardController {
       onSave: this.handleSaveRole.bind(this)
     });
 
+    // 3b. Header breadcrumb navigation handler
+    this.view.onBreadcrumbNavigate = (target, workspaceId) => {
+      if (target === 'workspaces') {
+        this.handleNavigation('workspaces');
+      } else if (target === 'workspace-detail' && workspaceId) {
+        this.openWorkspaceDetail(workspaceId);
+      }
+    };
+
     // 4. Handle initial section display based on URL hash
     const initialHash = window.location.hash.replace('#', '') || 'overview';
     await this.handleNavigation(initialHash);
@@ -348,20 +357,13 @@ export class DashboardController {
         onBackToWorkspaces: () => {
           this.handleNavigation('workspaces');
         },
-        onToggleChannelStatus: async (channelId, currentActive) => {
-          const targetActive = !currentActive;
-          this.view.setChannelToggleLoading(channelId, true);
-          try {
-            await this.model.updateChannelStatus(channelId, targetActive);
-            this.view.updateChannelToggleState(channelId, targetActive);
-            const ch = channels.find(c => Number(c.id) === Number(channelId));
-            if (ch) ch.isActive = targetActive;
-          } catch (err) {
-            console.error(`DashboardController: Failed to toggle channel ${channelId} status:`, err);
-            this.view.updateChannelToggleState(channelId, currentActive);
-          } finally {
-            this.view.setChannelToggleLoading(channelId, false);
-          }
+        onConfigureChannel: (channelId) => {
+          const channel = (channels || []).find(c => Number(c.id) === Number(channelId)) || {
+            id: channelId,
+            platform: 'channel',
+            isActive: true
+          };
+          this.openChannelConfig(workspace, channel, channels);
         }
       });
     } catch (err) {
@@ -378,6 +380,12 @@ export class DashboardController {
       },
       onBackToWorkspaceDetail: () => {
         this.openWorkspaceDetail(workspace.id);
+      },
+      onToggleStatus: async (channelId, newStatus) => {
+        await this.model.updateChannelStatus(channelId, newStatus);
+        channel.isActive = newStatus;
+        const ch = (allChannels || []).find(c => Number(c.id) === Number(channelId));
+        if (ch) ch.isActive = newStatus;
       }
     });
   }

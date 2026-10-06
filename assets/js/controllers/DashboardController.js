@@ -364,6 +364,28 @@ export class DashboardController {
             isActive: true
           };
           this.openChannelConfig(workspace, channel, channels);
+        },
+        onOpenEditModal: () => {
+          this.view.showEditWorkspaceModal(workspace, channels, {
+            onSaveWorkspace: async (updatedData) => {
+              await this.model.updateWorkspace(workspace.id, updatedData);
+              workspace.name = updatedData.name;
+              workspace.serviceType = updatedData.serviceType;
+              workspace.currencyCode = updatedData.currencyCode;
+              await this.openWorkspaceDetail(workspace.id);
+            },
+            onDeleteChannel: async (channelId) => {
+              await this.model.deleteChannel(channelId);
+              const idx = channels.findIndex(c => Number(c.id) === Number(channelId));
+              if (idx !== -1) {
+                channels.splice(idx, 1);
+              }
+              const countEl = document.getElementById('workspace-channels-count-text');
+              if (countEl) {
+                countEl.textContent = `${channels.length} ${channels.length === 1 ? 'Channel' : 'Channels'}`;
+              }
+            }
+          });
         }
       });
     } catch (err) {

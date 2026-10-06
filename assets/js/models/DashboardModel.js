@@ -463,4 +463,26 @@ export class DashboardModel {
     const data = await this.apiService.updateChannelStatus(channelId, isActive);
     return data;
   }
+
+  /**
+   * Updates workspace data using PUT /workspaces/:workspaceId
+   */
+  async updateWorkspace(workspaceId, updateData) {
+    const data = await this.apiService.updateWorkspace(workspaceId, updateData);
+    if (this.cachedUserWorkspaces && Array.isArray(this.cachedUserWorkspaces.workspaces)) {
+      const ws = this.cachedUserWorkspaces.workspaces.find(w => String(w.id) === String(workspaceId));
+      if (ws) {
+        Object.assign(ws, updateData);
+      }
+    }
+    return data;
+  }
+
+  /**
+   * Deletes a channel using DELETE /channels/:id
+   */
+  async deleteChannel(channelId) {
+    const res = await this.apiService.deleteChannel(channelId);
+    return res;
+  }
 }

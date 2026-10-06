@@ -471,4 +471,67 @@ export class ApiService {
 
     return await response.json();
   }
+
+  async updateWorkspace(workspaceId, updateData) {
+    if (!workspaceId) {
+      throw new Error("workspaceId is required to update workspace");
+    }
+    const headers = await this.getHeaders();
+    const response = await fetch(`${CONFIG.API_BASE_URL}/workspaces/${encodeURIComponent(workspaceId)}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(updateData)
+    });
+
+    if (!response.ok) {
+      let serverMessage = response.statusText;
+      try {
+        const errorData = await response.json();
+        serverMessage = errorData.message || errorData.error || errorData.detail || JSON.stringify(errorData);
+      } catch (e) {
+        try {
+          const text = await response.text();
+          if (text) serverMessage = text;
+        } catch (_) {}
+      }
+
+      const err = new Error(serverMessage || `Request failed with status ${response.status}`);
+      err.status = response.status;
+      err.serverMessage = serverMessage;
+      throw err;
+    }
+
+    return await response.json();
+  }
+
+  async deleteChannel(channelId) {
+    if (!channelId) {
+      throw new Error("channelId is required to delete channel");
+    }
+    const headers = await this.getHeaders();
+    const response = await fetch(`${CONFIG.API_BASE_URL}/channels/${encodeURIComponent(channelId)}`, {
+      method: 'DELETE',
+      headers
+    });
+
+    if (!response.ok) {
+      let serverMessage = response.statusText;
+      try {
+        const errorData = await response.json();
+        serverMessage = errorData.message || errorData.error || errorData.detail || JSON.stringify(errorData);
+      } catch (e) {
+        try {
+          const text = await response.text();
+          if (text) serverMessage = text;
+        } catch (_) {}
+      }
+
+      const err = new Error(serverMessage || `Request failed with status ${response.status}`);
+      err.status = response.status;
+      err.serverMessage = serverMessage;
+      throw err;
+    }
+
+    return await response.json().catch(() => ({ success: true }));
+  }
 }

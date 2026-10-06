@@ -34,6 +34,7 @@ export class DashboardView {
     this.workspaceBreadcrumbs = document.getElementById('workspace-breadcrumbs');
     this.workspaceDetailContent = document.getElementById('workspace-detail-content');
     this.navbarBreadcrumbsContainer = document.getElementById('navbar-breadcrumbs-container');
+    this.modalContainer = document.getElementById('modal-container');
     this.onBreadcrumbNavigate = null;
 
     // Callbacks for role editing
@@ -1621,29 +1622,96 @@ export class DashboardView {
         </div>
       `;
 
-    // 3. Workspace Detail Master Content following UiUxInspiration/workspaces.html
+    // 3. Workspace Detail Master Content with Hero Data Banner & Channels
     this.workspaceDetailContent.innerHTML = `
       <div class="space-y-8 animate-in fade-in duration-200">
-        <!-- Header -->
-        <div class="flex items-center justify-between">
-          <div>
-            <h1 class="text-3xl font-extrabold tracking-tight text-white mb-1">${this._escape(workspace.name || `Workspace #${workspace.id}`)} Channels</h1>
-            <p class="text-sm text-zinc-400">Manage integrations and deployment status for this workspace.</p>
+        <!-- Hero Workspace Data Banner -->
+        <div class="bento-card rounded-3xl p-6 sm:p-8 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6 border border-zinc-800 shadow-2xl">
+          <div class="absolute -top-16 -right-16 w-48 h-48 ${isActive ? 'bg-emerald-500/10' : 'bg-zinc-700/5'} rounded-full blur-3xl pointer-events-none"></div>
+
+          <div class="flex items-start gap-4 sm:gap-5 min-w-0">
+            <div class="w-14 h-14 bg-zinc-800 rounded-2xl flex items-center justify-center border border-zinc-700 text-white font-bold text-xl shadow-inner shrink-0">
+              ${this._getInitials(workspace.name)}
+            </div>
+
+            <div class="min-w-0 space-y-1.5">
+              <div class="flex items-center gap-3 flex-wrap">
+                <h1 id="workspace-hero-name" class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white truncate" title="${this._escape(workspace.name || `Workspace #${workspace.id}`)}">
+                  ${this._escape(workspace.name || `Workspace #${workspace.id}`)}
+                </h1>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${isActive ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-zinc-800 border border-zinc-700 text-zinc-400'} text-[10px] font-bold uppercase tracking-wider">
+                  ${isActive ? '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Active' : 'Offline'}
+                </span>
+              </div>
+
+              <!-- Metadata Details Row: Created, Service Type, Currency, ID -->
+              <div class="flex flex-wrap items-center gap-3 text-xs text-zinc-400 font-mono">
+                <div class="flex items-center gap-1.5 text-zinc-300">
+                  <i class="fa-solid fa-calendar-days text-[11px] text-zinc-500"></i>
+                  <span id="workspace-hero-created">Created ${this._formatDate(workspace.createdAt)}</span>
+                </div>
+                <span>·</span>
+                <div class="flex items-center gap-1.5">
+                  <span class="text-zinc-500 font-sans">Type:</span>
+                  <span id="workspace-hero-service-type" class="px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-200 border border-zinc-700 text-[11px] font-semibold capitalize font-sans">
+                    ${this._formatServiceType(workspace.serviceType)}
+                  </span>
+                </div>
+                <span>·</span>
+                <div class="flex items-center gap-1.5">
+                  <span class="text-zinc-500 font-sans">Currency:</span>
+                  <span id="workspace-hero-currency" class="px-2 py-0.5 rounded-md bg-zinc-800 text-emerald-400 border border-zinc-700 text-[11px] font-bold uppercase">
+                    ${this._escape(workspace.currencyCode || 'USD')}
+                  </span>
+                </div>
+                <span>·</span>
+                <span class="text-zinc-500">ID #${workspace.id}</span>
+              </div>
+            </div>
           </div>
-          <span class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#111114] border border-zinc-800 text-xs text-zinc-300 font-medium shadow-sm">
-            <span class="w-2 h-2 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}"></span>
-            <span>${isActive ? 'Active Workspace' : 'Offline Workspace'}</span>
-          </span>
+
+          <!-- Edit Workspace Action Button -->
+          <div class="flex items-center gap-3 shrink-0 self-start md:self-auto">
+            <button 
+              type="button" 
+              id="open-edit-workspace-btn"
+              class="inline-flex items-center gap-2 bg-white hover:bg-zinc-200 text-black px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition transform hover:scale-[1.02] shadow-sm cursor-pointer"
+            >
+              <i class="fa-solid fa-pen-to-square text-xs"></i>
+              <span>Edit Workspace</span>
+            </button>
+          </div>
         </div>
 
-        <!-- Channels Grid (2 Columns as in workspaces.html inspiration) -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          ${channelsHtml}
+        <!-- Connected Channels Section -->
+        <div class="space-y-4">
+          <div class="flex items-center justify-between pb-1">
+            <div>
+              <h2 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                <span>Connected Channels</span>
+              </h2>
+              <p class="text-xs text-zinc-400 mt-0.5">Integrations routing conversations and checkout events for this storefront.</p>
+            </div>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#111114] border border-zinc-800 text-xs text-zinc-300 font-mono">
+              <i class="fa-solid fa-circle-nodes text-xs text-zinc-400"></i>
+              <span id="workspace-channels-count-text">${channelsList.length} ${channelsList.length === 1 ? 'Channel' : 'Channels'}</span>
+            </span>
+          </div>
+
+          <!-- Channels Grid (2 Columns per inspiration) -->
+          <div id="workspace-channels-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            ${channelsHtml}
+          </div>
         </div>
       </div>
     `;
 
     // 4. Attach Event Listeners
+    const editBtn = document.getElementById('open-edit-workspace-btn');
+    if (editBtn && onOpenEditModal) {
+      editBtn.addEventListener('click', () => onOpenEditModal());
+    }
+
     this.workspaceDetailContent.querySelectorAll('.configure-channel-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const channelId = Number(btn.dataset.channelId);
@@ -1654,68 +1722,232 @@ export class DashboardView {
     });
   }
 
-  setChannelToggleLoading(channelId, isLoading) {
-    const btn = document.getElementById(`channel-toggle-${channelId}`);
-    const spinner = document.getElementById(`channel-toggle-spinner-${channelId}`);
-    if (btn) {
-      btn.disabled = isLoading;
-      btn.classList.toggle('opacity-70', isLoading);
-      btn.classList.toggle('cursor-wait', isLoading);
-    }
-    if (spinner) {
-      spinner.classList.toggle('hidden', !isLoading);
+  _formatDate(dateStr) {
+    if (!dateStr) return 'N/A';
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch (_) {
+      return dateStr;
     }
   }
 
-  updateChannelToggleState(channelId, newIsActive) {
-    const btn = document.getElementById(`channel-toggle-${channelId}`);
-    const thumb = document.getElementById(`channel-toggle-thumb-${channelId}`);
-    const badge = document.getElementById(`channel-status-badge-${channelId}`);
-    const dot = document.getElementById(`channel-status-dot-${channelId}`);
-    const text = document.getElementById(`channel-status-text-${channelId}`);
-    const subtext = document.getElementById(`channel-toggle-subtext-${channelId}`);
+  _formatServiceType(type) {
+    if (!type) return 'Product Based';
+    return String(type)
+      .split('_')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  }
 
-    if (btn) {
-      btn.dataset.active = newIsActive ? 'true' : 'false';
-      btn.setAttribute('aria-checked', newIsActive ? 'true' : 'false');
-      btn.title = newIsActive ? 'Click to deactivate channel' : 'Click to activate channel';
-      if (newIsActive) {
-        btn.classList.remove('bg-zinc-700');
-        btn.classList.add('bg-emerald-500');
-      } else {
-        btn.classList.remove('bg-emerald-500');
-        btn.classList.add('bg-zinc-700');
-      }
+  showEditWorkspaceModal(workspace, channels, { onSaveWorkspace, onDeleteChannel }) {
+    const modalContainer = this.modalContainer || document.getElementById('modal-container');
+    if (!modalContainer) return;
+
+    const channelsList = Array.isArray(channels) ? channels : [];
+
+    modalContainer.innerHTML = `
+      <div id="edit-workspace-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
+        <div class="bento-card w-full max-w-xl rounded-3xl p-6 sm:p-8 bg-[#111114] border border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col gap-6">
+          <!-- Header -->
+          <div class="flex items-start justify-between pb-4 border-b border-zinc-800">
+            <div>
+              <h3 class="text-xl font-bold text-white tracking-tight flex items-center gap-2.5">
+                <i class="fa-solid fa-pen-to-square text-zinc-400 text-base"></i>
+                <span>Edit Workspace Data</span>
+              </h3>
+              <p class="text-xs text-zinc-400 mt-1">Update workspace metadata, operational model, and connected channels.</p>
+            </div>
+            <button type="button" id="close-edit-modal-btn" class="text-zinc-500 hover:text-white p-2 rounded-xl hover:bg-zinc-800/80 transition cursor-pointer">
+              <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+          </div>
+
+          <!-- Form Fields -->
+          <form id="edit-workspace-form" class="space-y-4">
+            <!-- Workspace Name -->
+            <div>
+              <label for="edit-workspace-name-input" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">Workspace Name</label>
+              <input 
+                type="text" 
+                id="edit-workspace-name-input" 
+                value="${this._escape(workspace.name || '')}" 
+                required 
+                class="w-full bg-[#0d0d10] border border-zinc-700 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 rounded-xl px-4 py-2.5 text-sm text-white font-medium transition"
+              />
+            </div>
+
+            <!-- Service Type Dropdown Menu (2 options) -->
+            <div>
+              <label for="edit-workspace-service-type-select" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">Service Type</label>
+              <div class="relative">
+                <select 
+                  id="edit-workspace-service-type-select" 
+                  class="w-full appearance-none bg-[#0d0d10] border border-zinc-700 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 rounded-xl px-4 py-2.5 text-sm text-white font-medium transition pr-10 cursor-pointer"
+                >
+                  <option value="product_based" ${workspace.serviceType === 'product_based' ? 'selected' : ''}>1- product_based (Product Based E-Commerce)</option>
+                  <option value="service_based" ${workspace.serviceType === 'service_based' ? 'selected' : ''}>2- service_based (Service & Consultation Based)</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-zinc-400">
+                  <i class="fa-solid fa-chevron-down text-xs"></i>
+                </div>
+              </div>
+              <p class="text-[11px] text-zinc-500 mt-1">Select whether this storefront processes product SKU checkouts or booking services.</p>
+            </div>
+
+            <!-- Currency Code -->
+            <div>
+              <label for="edit-workspace-currency-input" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">Currency Code</label>
+              <input 
+                type="text" 
+                id="edit-workspace-currency-input" 
+                value="${this._escape(workspace.currencyCode || 'USD')}" 
+                maxlength="5" 
+                required 
+                class="w-full bg-[#0d0d10] border border-zinc-700 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 rounded-xl px-4 py-2.5 text-sm text-white font-mono uppercase transition"
+              />
+            </div>
+
+            <!-- Channels Management Section (Delete Channel) -->
+            <div class="pt-2 border-t border-zinc-800/80">
+              <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2.5">
+                Connected Channels (<span id="modal-channels-count">${channelsList.length}</span>)
+              </label>
+              <div id="modal-channels-list" class="space-y-2 max-h-40 overflow-y-auto no-scrollbar">
+                ${channelsList.length > 0 ? channelsList.map(c => `
+                  <div class="flex items-center justify-between p-2.5 rounded-xl bg-[#0d0d10] border border-zinc-800 text-xs" id="modal-channel-row-${c.id}">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <span class="w-7 h-7 rounded-lg bg-zinc-800 flex items-center justify-center shrink-0">
+                        ${this._getChannelIcon(c.platform || c.channel)}
+                      </span>
+                      <span class="font-semibold text-white capitalize truncate">${this._escape(c.platform || c.channel || 'channel')}</span>
+                      <span class="text-zinc-500 font-mono text-[11px]">#${c.id}</span>
+                    </div>
+                    <button 
+                      type="button" 
+                      class="delete-channel-modal-btn inline-flex items-center gap-1 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 px-2.5 py-1 rounded-lg border border-rose-500/20 text-xs font-medium transition cursor-pointer"
+                      data-channel-id="${c.id}"
+                      data-platform="${this._escape(c.platform || c.channel || 'channel')}"
+                    >
+                      <i class="fa-solid fa-trash-can text-[10px]"></i>
+                      <span>Delete</span>
+                    </button>
+                  </div>
+                `).join('') : '<p class="text-xs text-zinc-500 italic">No channels linked</p>'}
+              </div>
+            </div>
+
+            <!-- Form Error Box -->
+            <div id="edit-workspace-error-box" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium"></div>
+
+            <!-- Modal Footer Actions -->
+            <div class="pt-4 border-t border-zinc-800 flex items-center justify-end gap-3">
+              <button 
+                type="button" 
+                id="cancel-edit-modal-btn" 
+                class="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                id="save-edit-workspace-btn" 
+                class="inline-flex items-center gap-2 bg-white hover:bg-zinc-200 text-black px-5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition transform hover:scale-[1.02] shadow-sm cursor-pointer"
+              >
+                <span id="save-ws-spinner" class="hidden w-3 h-3 border-2 border-black border-t-transparent rounded-full animate-spin"></span>
+                <span>Save Changes</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    // Event listeners for close
+    const closeBtn = document.getElementById('close-edit-modal-btn');
+    const cancelBtn = document.getElementById('cancel-edit-modal-btn');
+    const form = document.getElementById('edit-workspace-form');
+    const errorBox = document.getElementById('edit-workspace-error-box');
+    const saveBtn = document.getElementById('save-edit-workspace-btn');
+    const spinner = document.getElementById('save-ws-spinner');
+
+    const handleClose = () => this.closeEditWorkspaceModal();
+    if (closeBtn) closeBtn.addEventListener('click', handleClose);
+    if (cancelBtn) cancelBtn.addEventListener('click', handleClose);
+
+    // Event listeners for delete channel inside modal
+    modalContainer.querySelectorAll('.delete-channel-modal-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const channelId = Number(btn.dataset.channelId);
+        const platform = btn.dataset.platform;
+        if (!confirm(`Are you sure you want to delete the ${platform} channel (#${channelId})?`)) {
+          return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = `<span class="w-2.5 h-2.5 border-2 border-rose-400 border-t-transparent rounded-full animate-spin"></span>`;
+
+        try {
+          if (onDeleteChannel) {
+            await onDeleteChannel(channelId);
+          }
+          const row = document.getElementById(`modal-channel-row-${channelId}`);
+          if (row) row.remove();
+          const card = document.getElementById(`channel-card-${channelId}`);
+          if (card) card.remove();
+        } catch (err) {
+          console.error("Failed to delete channel:", err);
+          btn.disabled = false;
+          btn.innerHTML = `<i class="fa-solid fa-trash-can text-[10px]"></i> <span>Delete</span>`;
+          if (errorBox) {
+            errorBox.textContent = err.serverMessage || err.message || "Failed to delete channel";
+            errorBox.classList.remove('hidden');
+          }
+        }
+      });
+    });
+
+    // Form submission for updating workspace
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const nameInput = document.getElementById('edit-workspace-name-input');
+        const serviceSelect = document.getElementById('edit-workspace-service-type-select');
+        const currencyInput = document.getElementById('edit-workspace-currency-input');
+
+        const updatedData = {
+          name: nameInput?.value?.trim() || workspace.name,
+          serviceType: serviceSelect?.value || 'product_based',
+          currencyCode: currencyInput?.value?.trim().toUpperCase() || 'USD'
+        };
+
+        if (saveBtn) saveBtn.disabled = true;
+        if (spinner) spinner.classList.remove('hidden');
+        if (errorBox) errorBox.classList.add('hidden');
+
+        try {
+          if (onSaveWorkspace) {
+            await onSaveWorkspace(updatedData);
+          }
+          this.closeEditWorkspaceModal();
+        } catch (err) {
+          console.error("Failed to save workspace:", err);
+          if (errorBox) {
+            errorBox.textContent = err.serverMessage || err.message || "Failed to update workspace";
+            errorBox.classList.remove('hidden');
+          }
+        } finally {
+          if (saveBtn) saveBtn.disabled = false;
+          if (spinner) spinner.classList.add('hidden');
+        }
+      });
     }
+  }
 
-    if (thumb) {
-      if (newIsActive) {
-        thumb.classList.remove('translate-x-0');
-        thumb.classList.add('translate-x-5');
-      } else {
-        thumb.classList.remove('translate-x-5');
-        thumb.classList.add('translate-x-0');
-      }
-    }
-
-    if (badge) {
-      if (newIsActive) {
-        badge.className = "inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors duration-300 bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
-      } else {
-        badge.className = "inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors duration-300 bg-zinc-800 text-zinc-400 border-zinc-700";
-      }
-    }
-
-    if (dot) {
-      dot.className = `w-1.5 h-1.5 rounded-full ${newIsActive ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}`;
-    }
-
-    if (text) {
-      text.textContent = newIsActive ? 'Active' : 'Offline';
-    }
-
-    if (subtext) {
-      subtext.textContent = newIsActive ? 'Traffic enabled' : 'Traffic paused';
+  closeEditWorkspaceModal() {
+    const modalContainer = this.modalContainer || document.getElementById('modal-container');
+    if (modalContainer) {
+      modalContainer.innerHTML = '';
     }
   }
 

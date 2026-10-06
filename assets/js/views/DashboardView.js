@@ -1571,7 +1571,7 @@ export class DashboardView {
     });
   }
 
-  renderWorkspaceDetailView(workspace, channels, { onBackToWorkspaces, onConfigureChannel }) {
+  renderWorkspaceDetailView(workspace, channels, { onBackToWorkspaces, onConfigureChannel, onOpenEditWorkspace }) {
     if (!this.workspaceDetailContent) return;
 
     const isActive = String(workspace.status || '').toLowerCase() === 'active';
@@ -1708,8 +1708,8 @@ export class DashboardView {
 
     // 4. Attach Event Listeners
     const editBtn = document.getElementById('open-edit-workspace-btn');
-    if (editBtn && onOpenEditModal) {
-      editBtn.addEventListener('click', () => onOpenEditModal());
+    if (editBtn && onOpenEditWorkspace) {
+      editBtn.addEventListener('click', () => onOpenEditWorkspace());
     }
 
     this.workspaceDetailContent.querySelectorAll('.configure-channel-btn').forEach(btn => {
@@ -1740,143 +1740,174 @@ export class DashboardView {
       .join(' ');
   }
 
-  showEditWorkspaceModal(workspace, channels, { onSaveWorkspace, onDeleteChannel }) {
-    const modalContainer = this.modalContainer || document.getElementById('modal-container');
-    if (!modalContainer) return;
+  renderEditWorkspaceView(workspace, channels, { onBackToWorkspaces, onBackToWorkspaceDetail, onSaveWorkspace, onDeleteChannel }) {
+    if (!this.workspaceDetailContent) return;
 
     const channelsList = Array.isArray(channels) ? channels : [];
 
-    modalContainer.innerHTML = `
-      <div id="edit-workspace-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
-        <div class="bento-card w-full max-w-xl rounded-3xl p-6 sm:p-8 bg-[#111114] border border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col gap-6">
-          <!-- Header -->
-          <div class="flex items-start justify-between pb-4 border-b border-zinc-800">
-            <div>
-              <h3 class="text-xl font-bold text-white tracking-tight flex items-center gap-2.5">
-                <i class="fa-solid fa-pen-to-square text-zinc-400 text-base"></i>
-                <span>Edit Workspace Data</span>
-              </h3>
-              <p class="text-xs text-zinc-400 mt-1">Update workspace metadata, operational model, and connected channels.</p>
-            </div>
-            <button type="button" id="close-edit-modal-btn" class="text-zinc-500 hover:text-white p-2 rounded-xl hover:bg-zinc-800/80 transition cursor-pointer">
-              <i class="fa-solid fa-xmark text-lg"></i>
-            </button>
-          </div>
+    // 1. Dynamic Breadcrumbs In Top Header: Workspaces / [Workspace Name] / Edit Workspace
+    this.renderHeaderBreadcrumbs([
+      { label: 'Workspaces', target: 'workspaces', action: 'workspaces', icon: '<i class="fa-solid fa-layer-group text-xs text-zinc-400"></i>' },
+      { label: workspace.name || `Workspace #${workspace.id}`, target: 'workspace-detail', action: 'workspace-detail', workspaceId: workspace.id },
+      { label: 'Edit Workspace', icon: '<i class="fa-solid fa-pen-to-square text-xs text-zinc-400"></i>' }
+    ]);
 
-          <!-- Form Fields -->
-          <form id="edit-workspace-form" class="space-y-4">
-            <!-- Workspace Name -->
-            <div>
-              <label for="edit-workspace-name-input" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">Workspace Name</label>
-              <input 
-                type="text" 
-                id="edit-workspace-name-input" 
-                value="${this._escape(workspace.name || '')}" 
-                required 
-                class="w-full bg-[#0d0d10] border border-zinc-700 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 rounded-xl px-4 py-2.5 text-sm text-white font-medium transition"
-              />
-            </div>
-
-            <!-- Service Type Dropdown Menu (2 options) -->
-            <div>
-              <label for="edit-workspace-service-type-select" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">Service Type</label>
-              <div class="relative">
-                <select 
-                  id="edit-workspace-service-type-select" 
-                  class="w-full appearance-none bg-[#0d0d10] border border-zinc-700 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 rounded-xl px-4 py-2.5 text-sm text-white font-medium transition pr-10 cursor-pointer"
-                >
-                  <option value="product_based" ${workspace.serviceType === 'product_based' ? 'selected' : ''}>1- product_based (Product Based E-Commerce)</option>
-                  <option value="service_based" ${workspace.serviceType === 'service_based' ? 'selected' : ''}>2- service_based (Service & Consultation Based)</option>
-                </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-zinc-400">
-                  <i class="fa-solid fa-chevron-down text-xs"></i>
+    // 2. Edit Workspace Form View following UiUxInspiration/workspaces.html
+    this.workspaceDetailContent.innerHTML = `
+      <div class="space-y-8 animate-in fade-in duration-200">
+        <div class="max-w-3xl">
+          <div class="bento-card rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl">
+            
+            <!-- Header -->
+            <div class="p-6 sm:p-8 border-b border-zinc-800 bg-[#0d0d10] flex items-center justify-between gap-4">
+              <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-zinc-800 rounded-xl flex items-center justify-center border border-zinc-700 text-white font-bold text-lg shadow-inner shrink-0">
+                  ${this._getInitials(workspace.name)}
+                </div>
+                <div>
+                  <h2 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                    <span>Edit Workspace</span>
+                    <span class="text-xs px-2.5 py-0.5 rounded-full border border-zinc-700 bg-zinc-800 text-zinc-400 font-mono">
+                      ID #${workspace.id}
+                    </span>
+                  </h2>
+                  <p class="text-xs text-zinc-400 mt-0.5">Update storefront metadata, service type model, and manage integrations.</p>
                 </div>
               </div>
-              <p class="text-[11px] text-zinc-500 mt-1">Select whether this storefront processes product SKU checkouts or booking services.</p>
             </div>
 
-            <!-- Currency Code -->
-            <div>
-              <label for="edit-workspace-currency-input" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">Currency Code</label>
-              <input 
-                type="text" 
-                id="edit-workspace-currency-input" 
-                value="${this._escape(workspace.currencyCode || 'USD')}" 
-                maxlength="5" 
-                required 
-                class="w-full bg-[#0d0d10] border border-zinc-700 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 rounded-xl px-4 py-2.5 text-sm text-white font-mono uppercase transition"
-              />
-            </div>
-
-            <!-- Channels Management Section (Delete Channel) -->
-            <div class="pt-2 border-t border-zinc-800/80">
-              <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2.5">
-                Connected Channels (<span id="modal-channels-count">${channelsList.length}</span>)
-              </label>
-              <div id="modal-channels-list" class="space-y-2 max-h-40 overflow-y-auto no-scrollbar">
-                ${channelsList.length > 0 ? channelsList.map(c => `
-                  <div class="flex items-center justify-between p-2.5 rounded-xl bg-[#0d0d10] border border-zinc-800 text-xs" id="modal-channel-row-${c.id}">
-                    <div class="flex items-center gap-2.5 min-w-0">
-                      <span class="w-7 h-7 rounded-lg bg-zinc-800 flex items-center justify-center shrink-0">
-                        ${this._getChannelIcon(c.platform || c.channel)}
-                      </span>
-                      <span class="font-semibold text-white capitalize truncate">${this._escape(c.platform || c.channel || 'channel')}</span>
-                      <span class="text-zinc-500 font-mono text-[11px]">#${c.id}</span>
-                    </div>
-                    <button 
-                      type="button" 
-                      class="delete-channel-modal-btn inline-flex items-center gap-1 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 px-2.5 py-1 rounded-lg border border-rose-500/20 text-xs font-medium transition cursor-pointer"
-                      data-channel-id="${c.id}"
-                      data-platform="${this._escape(c.platform || c.channel || 'channel')}"
-                    >
-                      <i class="fa-solid fa-trash-can text-[10px]"></i>
-                      <span>Delete</span>
-                    </button>
-                  </div>
-                `).join('') : '<p class="text-xs text-zinc-500 italic">No channels linked</p>'}
+            <!-- Form Body -->
+            <form id="edit-workspace-page-form" class="p-6 sm:p-8 space-y-6">
+              
+              <!-- Workspace Name -->
+              <div>
+                <label for="edit-page-ws-name" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
+                  Workspace Name
+                </label>
+                <input 
+                  type="text" 
+                  id="edit-page-ws-name" 
+                  value="${this._escape(workspace.name || '')}" 
+                  required 
+                  placeholder="e.g. Xynex.Cloth"
+                  class="w-full bg-[#0d0d10] border border-zinc-700 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 rounded-xl px-4 py-2.5 text-sm text-white font-medium transition"
+                />
               </div>
-            </div>
 
-            <!-- Form Error Box -->
-            <div id="edit-workspace-error-box" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium"></div>
+              <!-- Service Type Dropdown Menu (2 options) -->
+              <div>
+                <label for="edit-page-ws-service-type" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
+                  Service Type
+                </label>
+                <div class="relative">
+                  <select 
+                    id="edit-page-ws-service-type" 
+                    class="w-full appearance-none bg-[#0d0d10] border border-zinc-700 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 rounded-xl px-4 py-2.5 text-sm text-white font-medium transition pr-10 cursor-pointer"
+                  >
+                    <option value="product_based" ${workspace.serviceType === 'product_based' ? 'selected' : ''}>1- product_based (Product Based E-Commerce)</option>
+                    <option value="service_based" ${workspace.serviceType === 'service_based' ? 'selected' : ''}>2- service_based (Service & Consultation Based)</option>
+                  </select>
+                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-zinc-400">
+                    <i class="fa-solid fa-chevron-down text-xs"></i>
+                  </div>
+                </div>
+                <p class="text-[11px] text-zinc-500 mt-1.5">Select whether this storefront processes product SKU checkouts or booking services.</p>
+              </div>
 
-            <!-- Modal Footer Actions -->
-            <div class="pt-4 border-t border-zinc-800 flex items-center justify-end gap-3">
-              <button 
-                type="button" 
-                id="cancel-edit-modal-btn" 
-                class="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white transition cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button 
-                type="submit" 
-                id="save-edit-workspace-btn" 
-                class="inline-flex items-center gap-2 bg-white hover:bg-zinc-200 text-black px-5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition transform hover:scale-[1.02] shadow-sm cursor-pointer"
-              >
-                <span id="save-ws-spinner" class="hidden w-3 h-3 border-2 border-black border-t-transparent rounded-full animate-spin"></span>
-                <span>Save Changes</span>
-              </button>
-            </div>
-          </form>
+              <!-- Currency Code -->
+              <div>
+                <label for="edit-page-ws-currency" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
+                  Currency Code
+                </label>
+                <input 
+                  type="text" 
+                  id="edit-page-ws-currency" 
+                  value="${this._escape(workspace.currencyCode || 'USD')}" 
+                  maxlength="5" 
+                  required 
+                  placeholder="USD"
+                  class="w-full bg-[#0d0d10] border border-zinc-700 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 rounded-xl px-4 py-2.5 text-sm text-white font-mono uppercase transition"
+                />
+                <p class="text-[11px] text-zinc-500 mt-1.5">The ISO currency code for orders and checkouts (e.g. USD, EUR, GBP).</p>
+              </div>
+
+              <!-- Connected Channels Section (Delete Channel) -->
+              <div class="pt-4 border-t border-zinc-800">
+                <div class="flex items-center justify-between mb-3">
+                  <label class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+                    Connected Channels (<span id="edit-page-channels-count">${channelsList.length}</span>)
+                  </label>
+                  <span class="text-[11px] text-zinc-500">Manage integrations linked to this workspace</span>
+                </div>
+
+                <div id="edit-page-channels-list" class="space-y-2.5">
+                  ${channelsList.length > 0 ? channelsList.map(c => `
+                    <div class="flex items-center justify-between p-3 rounded-2xl bg-[#0d0d10] border border-zinc-800 text-xs" id="channel-row-${c.id}">
+                      <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-9 h-9 rounded-xl bg-zinc-800 flex items-center justify-center shrink-0">
+                          ${this._getChannelIcon(c.platform || c.channel)}
+                        </div>
+                        <div>
+                          <div class="font-semibold text-white capitalize">${this._escape(c.platform || c.channel || 'channel')} Channel</div>
+                          <div class="text-zinc-500 font-mono text-[11px]">ID: #${c.id} ${c.metaPageId ? `· Meta: ${this._escape(c.metaPageId)}` : ''}</div>
+                        </div>
+                      </div>
+                      <button 
+                        type="button" 
+                        class="delete-channel-page-btn inline-flex items-center gap-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 px-3 py-1.5 rounded-xl border border-rose-500/20 text-xs font-medium transition cursor-pointer"
+                        data-channel-id="${c.id}"
+                        data-platform="${this._escape(c.platform || c.channel || 'channel')}"
+                      >
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                  `).join('') : '<p class="text-xs text-zinc-500 italic p-3 rounded-xl bg-[#0d0d10] border border-zinc-800">No channels linked to this workspace.</p>'}
+                </div>
+              </div>
+
+              <!-- Error Notification Box -->
+              <div id="edit-workspace-page-error" class="hidden p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium"></div>
+
+              <!-- Form Actions -->
+              <div class="pt-4 border-t border-zinc-800 flex items-center justify-between">
+                <button 
+                  type="button" 
+                  id="cancel-edit-page-btn" 
+                  class="px-4 py-2.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white transition cursor-pointer flex items-center gap-2"
+                >
+                  <i class="fa-solid fa-arrow-left text-xs"></i>
+                  <span>Back to Workspace</span>
+                </button>
+                <button 
+                  type="submit" 
+                  id="save-edit-page-btn" 
+                  class="inline-flex items-center gap-2 bg-white hover:bg-zinc-200 text-black px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition transform hover:scale-[1.02] shadow-sm cursor-pointer"
+                >
+                  <span id="save-page-spinner" class="hidden w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin"></span>
+                  <span>Save Changes</span>
+                </button>
+              </div>
+
+            </form>
+          </div>
         </div>
       </div>
     `;
 
-    // Event listeners for close
-    const closeBtn = document.getElementById('close-edit-modal-btn');
-    const cancelBtn = document.getElementById('cancel-edit-modal-btn');
-    const form = document.getElementById('edit-workspace-form');
-    const errorBox = document.getElementById('edit-workspace-error-box');
-    const saveBtn = document.getElementById('save-edit-workspace-btn');
-    const spinner = document.getElementById('save-ws-spinner');
+    // Attach Event Listeners
+    const cancelBtn = document.getElementById('cancel-edit-page-btn');
+    if (cancelBtn && onBackToWorkspaceDetail) {
+      cancelBtn.addEventListener('click', () => onBackToWorkspaceDetail());
+    }
 
-    const handleClose = () => this.closeEditWorkspaceModal();
-    if (closeBtn) closeBtn.addEventListener('click', handleClose);
-    if (cancelBtn) cancelBtn.addEventListener('click', handleClose);
+    const form = document.getElementById('edit-workspace-page-form');
+    const saveBtn = document.getElementById('save-edit-page-btn');
+    const spinner = document.getElementById('save-page-spinner');
+    const errorBox = document.getElementById('edit-workspace-page-error');
 
-    // Event listeners for delete channel inside modal
-    modalContainer.querySelectorAll('.delete-channel-modal-btn').forEach(btn => {
+    // Delete channel buttons
+    this.workspaceDetailContent.querySelectorAll('.delete-channel-page-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const channelId = Number(btn.dataset.channelId);
         const platform = btn.dataset.platform;
@@ -1885,20 +1916,23 @@ export class DashboardView {
         }
 
         btn.disabled = true;
-        btn.innerHTML = `<span class="w-2.5 h-2.5 border-2 border-rose-400 border-t-transparent rounded-full animate-spin"></span>`;
+        btn.innerHTML = `<span class="w-3 h-3 border-2 border-rose-400 border-t-transparent rounded-full animate-spin"></span>`;
 
         try {
           if (onDeleteChannel) {
             await onDeleteChannel(channelId);
           }
-          const row = document.getElementById(`modal-channel-row-${channelId}`);
+          const row = document.getElementById(`channel-row-${channelId}`);
           if (row) row.remove();
-          const card = document.getElementById(`channel-card-${channelId}`);
-          if (card) card.remove();
+          const countEl = document.getElementById('edit-page-channels-count');
+          if (countEl) {
+            const currentCount = parseInt(countEl.textContent, 10) || 1;
+            countEl.textContent = Math.max(0, currentCount - 1);
+          }
         } catch (err) {
           console.error("Failed to delete channel:", err);
           btn.disabled = false;
-          btn.innerHTML = `<i class="fa-solid fa-trash-can text-[10px]"></i> <span>Delete</span>`;
+          btn.innerHTML = `<i class="fa-solid fa-trash-can text-xs"></i> <span>Delete</span>`;
           if (errorBox) {
             errorBox.textContent = err.serverMessage || err.message || "Failed to delete channel";
             errorBox.classList.remove('hidden');
@@ -1907,13 +1941,13 @@ export class DashboardView {
       });
     });
 
-    // Form submission for updating workspace
+    // Form submission
     if (form) {
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const nameInput = document.getElementById('edit-workspace-name-input');
-        const serviceSelect = document.getElementById('edit-workspace-service-type-select');
-        const currencyInput = document.getElementById('edit-workspace-currency-input');
+        const nameInput = document.getElementById('edit-page-ws-name');
+        const serviceSelect = document.getElementById('edit-page-ws-service-type');
+        const currencyInput = document.getElementById('edit-page-ws-currency');
 
         const updatedData = {
           name: nameInput?.value?.trim() || workspace.name,
@@ -1929,7 +1963,6 @@ export class DashboardView {
           if (onSaveWorkspace) {
             await onSaveWorkspace(updatedData);
           }
-          this.closeEditWorkspaceModal();
         } catch (err) {
           console.error("Failed to save workspace:", err);
           if (errorBox) {
@@ -1941,13 +1974,6 @@ export class DashboardView {
           if (spinner) spinner.classList.add('hidden');
         }
       });
-    }
-  }
-
-  closeEditWorkspaceModal() {
-    const modalContainer = this.modalContainer || document.getElementById('modal-container');
-    if (modalContainer) {
-      modalContainer.innerHTML = '';
     }
   }
 

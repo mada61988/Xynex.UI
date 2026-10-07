@@ -2119,11 +2119,11 @@ export class DashboardView {
     }
   }
 
-  renderChannelConfigView(workspace, channel, { onBackToWorkspaces, onBackToWorkspaceDetail, onToggleStatus }) {
+  renderChannelConfigView(workspace, channel, { onBackToWorkspaces, onBackToWorkspaceDetail, onToggleStatus, onSaveChannel }) {
     if (!this.workspaceDetailContent) return;
 
     const chPlatform = channel.platform || channel.channel || 'webchat';
-    const isChActive = Boolean(channel.isActive);
+    let isChActive = Boolean(channel.isActive);
 
     // 1. Dynamic Breadcrumbs In Top Header: Workspaces / [Workspace Name] / [Channel Name] Settings
     this.renderHeaderBreadcrumbs([
@@ -2132,24 +2132,32 @@ export class DashboardView {
       { label: `${this._escape(chPlatform)} Settings`, icon: `<i class="fa-brands fa-${this._escape(chPlatform)}"></i>` }
     ]);
 
-    // 2. Channel Configuration Panel following UiUxInspiration/workspaces.html
+    // 2. Channel Configuration Panel
     this.workspaceDetailContent.innerHTML = `
       <div class="space-y-8 animate-in fade-in duration-200">
         <div class="max-w-3xl">
-          <div class="bento-card rounded-3xl overflow-hidden">
+          <div class="bento-card rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl">
             
             <!-- Config Header & Master Toggle (Triggers PATCH /channels/:id/status) -->
-            <div class="p-6 sm:p-8 border-b border-zinc-800 bg-[#0d0d10] flex items-center justify-between">
-              <div>
-                <h2 class="text-xl font-bold text-white tracking-tight capitalize flex items-center gap-2">
+            <div class="p-6 sm:p-8 border-b border-zinc-800 bg-[#0d0d10] flex items-center justify-between gap-4">
+              <div class="flex items-center gap-4">
+                <div id="edit-channel-icon-wrapper" class="w-12 h-12 bg-zinc-800 rounded-xl flex items-center justify-center border border-zinc-700 text-white font-bold text-lg shadow-inner shrink-0">
                   ${this._getChannelIcon(chPlatform)}
-                  <span>${this._escape(chPlatform)} Configuration</span>
-                </h2>
-                <p class="text-xs text-zinc-400 mt-1">Manage API credentials and webhook routing for this integration.</p>
+                </div>
+                <div>
+                  <h2 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                    <span id="edit-channel-title" class="capitalize">${this._escape(chPlatform)}</span>
+                    <span>Configuration</span>
+                    <span class="text-xs px-2.5 py-0.5 rounded-full border border-zinc-700 bg-zinc-800 text-zinc-400 font-mono">
+                      ID #${channel.id}
+                    </span>
+                  </h2>
+                  <p class="text-xs text-zinc-400 mt-0.5">Manage API credentials and webhook routing for this integration.</p>
+                </div>
               </div>
 
               <!-- THE MASTER TOGGLE (Triggers PATCH /channels/:id/status) -->
-              <div class="flex flex-col items-end gap-2">
+              <div class="flex flex-col items-end gap-2 shrink-0">
                 <label class="relative inline-flex items-center cursor-pointer">
                   <input 
                     type="checkbox" 
@@ -2167,37 +2175,222 @@ export class DashboardView {
               </div>
             </div>
 
-            <!-- Form Fields -->
-            <div class="p-6 sm:p-8 space-y-6">
-              <!-- Platform & Channel ID -->
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-xs font-semibold text-zinc-300 mb-2">Platform</label>
-                  <input type="text" readonly value="${this._escape(chPlatform)}" class="w-full bg-[#0d0d10] border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white font-mono capitalize">
-                </div>
-                <div>
-                  <label class="block text-xs font-semibold text-zinc-300 mb-2">Channel ID</label>
-                  <input type="text" readonly value="${channel.id}" class="w-full bg-[#0d0d10] border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white font-mono">
+            <!-- Form Body -->
+            <form id="edit-channel-page-form" class="p-6 sm:p-8 space-y-6">
+              
+              <!-- Platform Dropdown -->
+              <div>
+                <label for="edit-channel-platform" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
+                  Platform
+                </label>
+                <div class="relative">
+                  <select 
+                    id="edit-channel-platform" 
+                    class="w-full appearance-none bg-[#0d0d10] border border-zinc-700 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 rounded-xl px-4 py-2.5 text-sm text-white font-medium transition pr-10 cursor-pointer capitalize"
+                  >
+                    <option value="facebook" ${chPlatform === 'facebook' ? 'selected' : ''}>Facebook</option>
+                    <option value="instagram" ${chPlatform === 'instagram' ? 'selected' : ''}>Instagram</option>
+                    <option value="whatsapp" ${chPlatform === 'whatsapp' ? 'selected' : ''}>WhatsApp</option>
+                    <option value="telegram" ${chPlatform === 'telegram' ? 'selected' : ''}>Telegram</option>
+                    <option value="webchat" ${chPlatform === 'webchat' ? 'selected' : ''}>Webchat</option>
+                  </select>
+                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-zinc-400">
+                    <i class="fa-solid fa-chevron-down text-xs"></i>
+                  </div>
                 </div>
               </div>
 
               <!-- Meta Page ID -->
               <div>
-                <label class="block text-xs font-semibold text-zinc-300 mb-2">Meta Page ID</label>
-                <input type="text" readonly value="${this._escape(channel.metaPageId || 'N/A')}" class="w-full bg-[#0d0d10] border border-zinc-700 focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 rounded-xl px-4 py-2.5 text-sm text-white font-mono transition">
+                <label for="edit-channel-meta-page-id" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
+                  Meta Page ID
+                </label>
+                <input 
+                  type="text" 
+                  id="edit-channel-meta-page-id" 
+                  value="${this._escape(channel.metaPageId || '')}" 
+                  placeholder="e.g. 10123456789"
+                  class="w-full bg-[#0d0d10] border border-zinc-700 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 rounded-xl px-4 py-2.5 text-sm text-white font-mono transition"
+                />
                 <p class="text-[10px] text-zinc-500 mt-1.5">The numeric ID of your connected Facebook/Instagram page.</p>
               </div>
 
-              <!-- Webhook Route -->
+              <!-- Page Access Token -->
               <div>
-                <label class="block text-xs font-semibold text-zinc-300 mb-2">Incoming Webhook Route</label>
-                <input type="text" readonly value="${CONFIG.API_BASE_URL}/webhooks/${encodeURIComponent(chPlatform)}/${channel.id}" class="w-full bg-[#0d0d10] border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-zinc-400 font-mono select-all">
-                <p class="text-[10px] text-zinc-500 mt-1.5">Meta Graph API events are securely forwarded to this endpoint.</p>
+                <label for="edit-channel-page-access-token" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
+                  Page Access Token
+                </label>
+                <input 
+                  type="text" 
+                  id="edit-channel-page-access-token" 
+                  value="${this._escape(channel.pageAccessToken || '')}" 
+                  placeholder="EAAGm0PX4ZC..."
+                  class="w-full bg-[#0d0d10] border border-zinc-700 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 rounded-xl px-4 py-2.5 text-sm text-white font-mono transition"
+                />
+                <p class="text-[10px] text-zinc-500 mt-1.5">The long-lived access token required to send and receive messages.</p>
               </div>
               
-              <!-- Actions -->
-              <div class="pt-4 flex items-center justify-end gap-3">
-                <button type="button" id="back-to-channels-list-btn" class="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white transition cursor-pointer">
+              <!-- Error Notification Box -->
+              <div id="edit-channel-page-error" class="hidden p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium"></div>
+
+              <!-- Form Actions -->
+              <div class="pt-4 border-t border-zinc-800 flex items-center justify-between">
+                <button 
+                  type="button" 
+                  id="back-to-channels-list-btn" 
+                  class="px-4 py-2.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white transition cursor-pointer flex items-center gap-2"
+                >
+                  <i class="fa-solid fa-arrow-left text-xs"></i>
+                  <span>Back to Workspace</span>
+                </button>
+                <button 
+                  type="submit" 
+                  id="save-channel-page-btn" 
+                  class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition border border-zinc-700 bg-zinc-800 text-zinc-500 opacity-40 cursor-not-allowed"
+                  disabled
+                >
+                  <span id="save-channel-spinner" class="hidden w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin"></span>
+                  <span>Save Changes</span>
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Attach Event Listeners
+    const backBtn = document.getElementById('back-to-channels-list-btn');
+    if (backBtn && onBackToWorkspaceDetail) {
+      backBtn.addEventListener('click', () => onBackToWorkspaceDetail());
+    }
+
+    const toggle = document.getElementById('channel-master-toggle');
+    const label = document.getElementById('channel-master-status-label');
+    if (toggle && onToggleStatus) {
+      toggle.addEventListener('change', async (e) => {
+        const isChecked = e.target.checked;
+        const previousState = !isChecked;
+        const channelId = toggle.dataset.channelId;
+
+        // Optimistic UI update
+        if (isChecked) {
+          label.textContent = 'Agent Active';
+          label.className = 'text-[10px] font-semibold text-emerald-400 tracking-wide uppercase';
+        } else {
+          label.textContent = 'Agent Offline';
+          label.className = 'text-[10px] font-semibold text-zinc-500 tracking-wide uppercase';
+        }
+        toggle.disabled = true;
+
+        try {
+          await onToggleStatus(channelId, isChecked);
+          isChActive = isChecked;
+          toggle.dataset.active = isChecked ? 'true' : 'false';
+        } catch (err) {
+          console.error("Failed to toggle status:", err);
+          // Revert UI on failure
+          toggle.checked = previousState;
+          if (previousState) {
+            label.textContent = 'Agent Active';
+            label.className = 'text-[10px] font-semibold text-emerald-400 tracking-wide uppercase';
+          } else {
+            label.textContent = 'Agent Offline';
+            label.className = 'text-[10px] font-semibold text-zinc-500 tracking-wide uppercase';
+          }
+          alert(err.serverMessage || err.message || "Failed to update channel status.");
+        } finally {
+          toggle.disabled = false;
+        }
+      });
+    }
+
+    const form = document.getElementById('edit-channel-page-form');
+    const saveBtn = document.getElementById('save-channel-page-btn');
+    const spinner = document.getElementById('save-channel-spinner');
+    const errorBox = document.getElementById('edit-channel-page-error');
+    const platformSelect = document.getElementById('edit-channel-platform');
+    const titleSpan = document.getElementById('edit-channel-title');
+    const iconWrapper = document.getElementById('edit-channel-icon-wrapper');
+
+    // Dynamic Icon & Title update on Platform selection change
+    if (platformSelect) {
+      platformSelect.addEventListener('change', (e) => {
+        const val = e.target.value;
+        if (titleSpan) titleSpan.textContent = val;
+        if (iconWrapper) iconWrapper.innerHTML = this._getChannelIcon(val);
+      });
+    }
+
+    // Live form validation to toggle Save button
+    if (form && saveBtn) {
+      const metaPageInput = document.getElementById('edit-channel-meta-page-id');
+      const tokenInput = document.getElementById('edit-channel-page-access-token');
+
+      const originalValues = {
+        platform: chPlatform,
+        metaPageId: channel.metaPageId || '',
+        pageAccessToken: channel.pageAccessToken || ''
+      };
+
+      const checkChanges = () => {
+        const currentPlatform = platformSelect?.value || 'webchat';
+        const currentMeta = metaPageInput?.value?.trim() || '';
+        const currentToken = tokenInput?.value?.trim() || '';
+
+        const hasChanged = 
+          currentPlatform !== originalValues.platform ||
+          currentMeta !== originalValues.metaPageId ||
+          currentToken !== originalValues.pageAccessToken;
+
+        if (hasChanged) {
+          saveBtn.disabled = false;
+          saveBtn.className = "inline-flex items-center gap-2 bg-white hover:bg-zinc-200 text-black px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition transform hover:scale-[1.02] shadow-sm cursor-pointer border border-white";
+        } else {
+          saveBtn.disabled = true;
+          saveBtn.className = "inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition border border-zinc-700 bg-zinc-800 text-zinc-500 opacity-40 cursor-not-allowed";
+        }
+      };
+
+      form.addEventListener('input', checkChanges);
+      form.addEventListener('change', checkChanges);
+    }
+
+    // Form submission
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const metaPageInput = document.getElementById('edit-channel-meta-page-id');
+        const tokenInput = document.getElementById('edit-channel-page-access-token');
+
+        const updatedData = {
+          platform: platformSelect?.value || 'webchat',
+          metaPageId: metaPageInput?.value?.trim() || null,
+          pageAccessToken: tokenInput?.value?.trim() || null
+        };
+
+        if (saveBtn) saveBtn.disabled = true;
+        if (spinner) spinner.classList.remove('hidden');
+        if (errorBox) errorBox.classList.add('hidden');
+
+        try {
+          if (onSaveChannel) {
+            await onSaveChannel(channel.id, updatedData);
+          }
+        } catch (err) {
+          console.error("Failed to save channel:", err);
+          if (errorBox) {
+            errorBox.textContent = err.serverMessage || err.message || "Failed to update channel configuration";
+            errorBox.classList.remove('hidden');
+          }
+        } finally {
+          if (saveBtn) saveBtn.disabled = false;
+          if (spinner) spinner.classList.add('hidden');
+        }
+      });
+    }
+  }
                   Back to ${this._escape(workspace.name || 'Workspace')}
                 </button>
               </div>

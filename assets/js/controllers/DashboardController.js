@@ -433,6 +433,19 @@ export class DashboardController {
         channel.isActive = newStatus;
         const ch = (allChannels || []).find(c => Number(c.id) === Number(channelId));
         if (ch) ch.isActive = newStatus;
+      },
+      onSaveChannel: async (channelId, updatedData) => {
+        await this.model.updateChannel(channelId, updatedData);
+        channel.platform = updatedData.platform;
+        channel.metaPageId = updatedData.metaPageId;
+        channel.pageAccessToken = updatedData.pageAccessToken;
+        const ch = (allChannels || []).find(c => Number(c.id) === Number(channelId));
+        if (ch) {
+          ch.platform = updatedData.platform;
+          ch.metaPageId = updatedData.metaPageId;
+          ch.pageAccessToken = updatedData.pageAccessToken;
+        }
+        await this.openWorkspaceDetail(workspace.id);
       }
     });
   }

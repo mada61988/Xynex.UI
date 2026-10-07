@@ -482,6 +482,14 @@ export class DashboardModel {
   }
 
   /**
+   * Updates channel data using PUT /channels/:id
+   */
+  async updateChannel(channelId, updateData) {
+    const data = await this.apiService.updateChannel(channelId, updateData);
+    return data;
+  }
+
+  /**
    * Updates workspace data using PUT /workspaces/:workspaceId
    */
   async updateWorkspace(workspaceId, updateData) {

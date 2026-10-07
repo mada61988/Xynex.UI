@@ -1597,7 +1597,7 @@ export class DashboardView {
                   </div>
                   <div>
                     <h3 class="font-bold text-white text-base capitalize">${this._escape(chPlatform)}</h3>
-                    <div class="text-[11px] font-mono text-zinc-500 mt-0.5">ID: ${this._escape(c.metaPageId || c.id)}</div>
+                    <div class="text-[11px] font-mono text-zinc-500 mt-0.5">Meta Page ID: ${this._escape(c.metaPageId || c.id)}</div>
                   </div>
                 </div>
                 <span class="text-[10px] font-bold ${isChActive ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-zinc-800 text-zinc-400 border border-zinc-700'} px-2 py-1 rounded-md uppercase">
@@ -1666,8 +1666,13 @@ export class DashboardView {
                       ${this._escape(workspace.currencyCode || 'USD')}
                     </span>
                   </div>
-                  <span>·</span>
-                  <div class="flex items-center gap-1.5">
+                 
+
+                  <!-- <span>·</span> --!>
+                  <!-- <span class="text-zinc-500">ID #${workspace.id}</span> --!>
+                </div>
+                 <div class="flex flex-wrap items-center gap-3 text-xs text-zinc-400 font-mono">
+                                   <div class="flex items-center gap-1.5">
                     <span class="text-zinc-500 font-sans">Meta App ID:</span>
                     <span class="text-zinc-300">${this._escape(workspace.metaAppId || 'N/A')}</span>
                   </div>
@@ -1676,9 +1681,7 @@ export class DashboardView {
                     <span class="text-zinc-500 font-sans">Meta App Secret:</span>
                     <span class="text-zinc-300">${workspace.metaAppSecret ? '••••••••' + this._escape(workspace.metaAppSecret).slice(-4) : 'N/A'}</span>
                   </div>
-                  <span>·</span>
-                  <span class="text-zinc-500">ID #${workspace.id}</span>
-                </div>
+                 </div>
               </div>
             </div>
 

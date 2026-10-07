@@ -38,18 +38,25 @@ export class AuthModel {
       const signInUrl = getAppUrl('signin.html');
       const signUpUrl = getAppUrl('signup.html');
 
-      await this.clerk.load({
+      const clerkLoadPromise = this.clerk.load({
         publishableKey: CONFIG.CLERK_PUBLISHABLE_KEY,
-        allowedRedirectOrigins: [window.location.origin, 'http://localhost:3000', 'https://mada61988.github.io'],
+        allowedRedirectOrigins: [window.location.origin, 'http://localhost:3000', 'http://localhost:5500', 'https://mada61988.github.io'],
         afterSignInUrl: dashboardUrl,
         afterSignUpUrl: dashboardUrl,
         afterSignOutUrl: homeUrl,
         signInUrl: signInUrl,
         signUpUrl: signUpUrl
       });
+
+      // Never allow clerk.load to block or hang the app
+      await Promise.race([
+        clerkLoadPromise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Clerk load timed out")), 3500))
+      ]);
+
       this.isReady = true;
     } catch (error) {
-      console.error("Error loading Clerk:", error);
+      console.warn("Clerk load notice:", error.message || error);
     }
   }
 

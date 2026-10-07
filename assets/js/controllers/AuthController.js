@@ -23,6 +23,12 @@ export class AuthController {
 
     // Strict Route Protection Guard (Initial Load)
     if (!this.model.user && isDashboard) {
+      const overlayText = document.getElementById('page-loading-text');
+      if (overlayText) overlayText.textContent = "Redirecting to Sign In...";
+      setTimeout(() => {
+        const overlay = document.getElementById('page-loading-overlay');
+        if (overlay) overlay.classList.add('hidden');
+      }, 2500);
       window.location.href = signinUrl;
       return;
     }

@@ -496,5 +496,15 @@
   <!-- Native ES Module Bootstrapper -->
   <script type="module" src="./assets/js/app.js"></script>
 
+  <!-- Failsafe auto-dismiss timer for page loading overlay -->
+  <script>
+    setTimeout(function() {
+      var overlay = document.getElementById('page-loading-overlay');
+      if (overlay && !overlay.classList.contains('hidden')) {
+        overlay.classList.add('hidden');
+      }
+    }, 4500);
+  </script>
+
 </body>
 </html>

@@ -2391,6 +2391,8 @@ export class DashboardView {
       });
     }
   }
+
+  renderWorkspacesCardsError(errorMessage, onRetry = null) {
     if (this.workspacesCountBadge) {
       this.workspacesCountBadge.innerHTML = `
         <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>

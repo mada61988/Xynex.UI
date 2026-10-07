@@ -1646,7 +1646,7 @@ export class DashboardView {
                   </span>
                 </div>
 
-                <!-- Metadata Details Row: Created, Service Type, Currency, Meta App ID, ID -->
+                <!-- Metadata Details Row: Created, Service Type, Currency, Meta App ID, Meta App Secret, ID -->
                 <div class="flex flex-wrap items-center gap-3 text-xs text-zinc-400 font-mono">
                   <div class="flex items-center gap-1.5 text-zinc-300">
                     <i class="fa-solid fa-calendar-days text-[11px] text-zinc-500"></i>
@@ -1670,6 +1670,11 @@ export class DashboardView {
                   <div class="flex items-center gap-1.5">
                     <span class="text-zinc-500 font-sans">Meta App ID:</span>
                     <span class="text-zinc-300">${this._escape(workspace.metaAppId || 'N/A')}</span>
+                  </div>
+                  <span>·</span>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-zinc-500 font-sans">Meta App Secret:</span>
+                    <span class="text-zinc-300">${workspace.metaAppSecret ? '••••••••' + this._escape(workspace.metaAppSecret).slice(-4) : 'N/A'}</span>
                   </div>
                   <span>·</span>
                   <span class="text-zinc-500">ID #${workspace.id}</span>
@@ -1902,6 +1907,21 @@ export class DashboardView {
                 <p class="text-[11px] text-zinc-500 mt-1.5">Enter the Meta App ID associated with this workspace's integrations.</p>
               </div>
 
+              <!-- Meta App Secret -->
+              <div>
+                <label for="edit-page-ws-meta-appsecret" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
+                  Meta App Secret
+                </label>
+                <input 
+                  type="text" 
+                  id="edit-page-ws-meta-appsecret" 
+                  value="${this._escape(workspace.metaAppSecret || '')}" 
+                  placeholder="e.g. 5f4dcc3b5aa765d61d8327deb882cf99"
+                  class="w-full bg-[#0d0d10] border border-zinc-700 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 rounded-xl px-4 py-2.5 text-sm text-white font-mono transition"
+                />
+                <p class="text-[11px] text-zinc-500 mt-1.5">Enter the Meta App Secret. This is required for secure Webhook integration.</p>
+              </div>
+
               <!-- Connected Channels Section (Delete Channel) -->
               <div class="pt-4 border-t border-zinc-800">
                 <div class="flex items-center justify-between mb-3">
@@ -1984,12 +2004,14 @@ export class DashboardView {
       const serviceSelect = document.getElementById('edit-page-ws-service-type');
       const currencyInput = document.getElementById('edit-page-ws-currency');
       const metaAppIdInput = document.getElementById('edit-page-ws-meta-appid');
+      const metaAppSecretInput = document.getElementById('edit-page-ws-meta-appsecret');
 
       const originalValues = {
         name: workspace.name || '',
         serviceType: workspace.serviceType || 'product_based',
         currencyCode: workspace.currencyCode || 'USD',
-        metaAppId: workspace.metaAppId || ''
+        metaAppId: workspace.metaAppId || '',
+        metaAppSecret: workspace.metaAppSecret || ''
       };
 
       const checkChanges = () => {
@@ -1997,12 +2019,14 @@ export class DashboardView {
         const currentService = serviceSelect?.value || 'product_based';
         const currentCurrency = currencyInput?.value?.trim().toUpperCase() || 'USD';
         const currentMeta = metaAppIdInput?.value?.trim() || '';
+        const currentMetaSecret = metaAppSecretInput?.value?.trim() || '';
 
         const hasChanged = 
           currentName !== originalValues.name ||
           currentService !== originalValues.serviceType ||
           currentCurrency !== originalValues.currencyCode ||
-          currentMeta !== originalValues.metaAppId;
+          currentMeta !== originalValues.metaAppId ||
+          currentMetaSecret !== originalValues.metaAppSecret;
 
         if (hasChanged) {
           saveBtn.disabled = false;
@@ -2060,12 +2084,14 @@ export class DashboardView {
         const serviceSelect = document.getElementById('edit-page-ws-service-type');
         const currencyInput = document.getElementById('edit-page-ws-currency');
         const metaAppIdInput = document.getElementById('edit-page-ws-meta-appid');
+        const metaAppSecretInput = document.getElementById('edit-page-ws-meta-appsecret');
 
         const updatedData = {
           name: nameInput?.value?.trim() || workspace.name,
           serviceType: serviceSelect?.value || 'product_based',
           currencyCode: currencyInput?.value?.trim().toUpperCase() || 'USD',
-          metaAppId: metaAppIdInput?.value?.trim() || null
+          metaAppId: metaAppIdInput?.value?.trim() || null,
+          metaAppSecret: metaAppSecretInput?.value?.trim() || null
         };
 
         if (saveBtn) saveBtn.disabled = true;

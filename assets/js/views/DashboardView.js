@@ -1953,7 +1953,8 @@ export class DashboardView {
                 <button 
                   type="submit" 
                   id="save-edit-page-btn" 
-                  class="inline-flex items-center gap-2 bg-white hover:bg-zinc-200 text-black px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition transform hover:scale-[1.02] shadow-sm cursor-pointer"
+                  class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition border border-zinc-700 bg-zinc-800 text-zinc-500 opacity-40 cursor-not-allowed"
+                  disabled
                 >
                   <span id="save-page-spinner" class="hidden w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin"></span>
                   <span>Save Changes</span>
@@ -1976,6 +1977,45 @@ export class DashboardView {
     const saveBtn = document.getElementById('save-edit-page-btn');
     const spinner = document.getElementById('save-page-spinner');
     const errorBox = document.getElementById('edit-workspace-page-error');
+
+    // Live form validation to toggle Save button
+    if (form && saveBtn) {
+      const nameInput = document.getElementById('edit-page-ws-name');
+      const serviceSelect = document.getElementById('edit-page-ws-service-type');
+      const currencyInput = document.getElementById('edit-page-ws-currency');
+      const metaAppIdInput = document.getElementById('edit-page-ws-meta-appid');
+
+      const originalValues = {
+        name: workspace.name || '',
+        serviceType: workspace.serviceType || 'product_based',
+        currencyCode: workspace.currencyCode || 'USD',
+        metaAppId: workspace.metaAppId || ''
+      };
+
+      const checkChanges = () => {
+        const currentName = nameInput?.value?.trim() || '';
+        const currentService = serviceSelect?.value || 'product_based';
+        const currentCurrency = currencyInput?.value?.trim().toUpperCase() || 'USD';
+        const currentMeta = metaAppIdInput?.value?.trim() || '';
+
+        const hasChanged = 
+          currentName !== originalValues.name ||
+          currentService !== originalValues.serviceType ||
+          currentCurrency !== originalValues.currencyCode ||
+          currentMeta !== originalValues.metaAppId;
+
+        if (hasChanged) {
+          saveBtn.disabled = false;
+          saveBtn.className = "inline-flex items-center gap-2 bg-white hover:bg-zinc-200 text-black px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition transform hover:scale-[1.02] shadow-sm cursor-pointer border border-white";
+        } else {
+          saveBtn.disabled = true;
+          saveBtn.className = "inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition border border-zinc-700 bg-zinc-800 text-zinc-500 opacity-40 cursor-not-allowed";
+        }
+      };
+
+      form.addEventListener('input', checkChanges);
+      form.addEventListener('change', checkChanges);
+    }
 
     // Delete channel buttons
     this.workspaceDetailContent.querySelectorAll('.delete-channel-page-btn').forEach(btn => {

@@ -343,17 +343,34 @@ export class DashboardController {
         status: 'active'
       };
 
+      // Concurrently fetch channels and the 4 workspace metrics
+      const [channelDataRes, salesRes, messagesRes, dmRes, ordersRes] = await Promise.allSettled([
+        this.model.fetchWorkspaceChannels(workspaceId),
+        this.model.fetchWorkspaceTotalSales(workspaceId),
+        this.model.fetchWorkspaceMessagesCount(workspaceId),
+        this.model.fetchWorkspaceDmToCheckout(workspaceId),
+        this.model.fetchWorkspacePlacedOrders(workspaceId)
+      ]);
+
       let channels = [];
-      try {
-        const channelData = await this.model.fetchWorkspaceChannels(workspaceId);
-        channels = channelData?.channels || (Array.isArray(channelData) ? channelData : (workspace.channels || []));
-      } catch (e) {
-        console.warn("Could not fetch workspace channels directly, using embedded channels:", e);
+      if (channelDataRes.status === 'fulfilled') {
+        const cd = channelDataRes.value;
+        channels = cd?.channels || (Array.isArray(cd) ? cd : (workspace.channels || []));
+      } else {
+        console.warn("Could not fetch workspace channels directly, using embedded channels:", channelDataRes.reason);
         channels = workspace.channels || [];
       }
 
+      const metrics = {
+        totalSales: salesRes.status === 'fulfilled' ? (salesRes.value?.formattedSales || '—') : '—',
+        currency: salesRes.status === 'fulfilled' ? (salesRes.value?.currency || workspace.currencyCode || 'USD') : (workspace.currencyCode || 'USD'),
+        messagesCount: messagesRes.status === 'fulfilled' ? (typeof messagesRes.value === 'number' ? messagesRes.value.toLocaleString() : messagesRes.value) : '—',
+        dmToCheckout: dmRes.status === 'fulfilled' ? `${dmRes.value}%` : '—',
+        placedOrdersCount: ordersRes.status === 'fulfilled' ? (Array.isArray(ordersRes.value) ? ordersRes.value.length : (ordersRes.value?.count ?? ordersRes.value ?? 0)) : '—'
+      };
+
       this.view.showSection('workspace-detail');
-      this.view.renderWorkspaceDetailView(workspace, channels, {
+      this.view.renderWorkspaceDetailView(workspace, channels, metrics, {
         onBackToWorkspaces: () => {
           this.handleNavigation('workspaces');
         },

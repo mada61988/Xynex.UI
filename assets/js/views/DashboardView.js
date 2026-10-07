@@ -1571,7 +1571,7 @@ export class DashboardView {
     });
   }
 
-  renderWorkspaceDetailView(workspace, channels, { onBackToWorkspaces, onConfigureChannel, onOpenEditWorkspace }) {
+  renderWorkspaceDetailView(workspace, channels, metrics = {}, { onBackToWorkspaces, onConfigureChannel, onOpenEditWorkspace }) {
     if (!this.workspaceDetailContent) return;
 
     const isActive = String(workspace.status || '').toLowerCase() === 'active';
@@ -1583,7 +1583,7 @@ export class DashboardView {
       { label: workspace.name || `Workspace #${workspace.id}` }
     ]);
 
-    // 2. Channels Cards HTML following UiUxInspiration/workspaces.html
+    // 2. Channels Cards HTML
     const channelsHtml = channelsList.length > 0
       ? channelsList.map(c => {
           const chPlatform = c.platform || c.channel || 'webchat';
@@ -1625,61 +1625,112 @@ export class DashboardView {
     // 3. Workspace Detail Master Content with Hero Data Banner & Channels
     this.workspaceDetailContent.innerHTML = `
       <div class="space-y-8 animate-in fade-in duration-200">
-        <!-- Hero Workspace Data Banner -->
-        <div class="bento-card rounded-3xl p-6 sm:p-8 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6 border border-zinc-800 shadow-2xl">
+        <!-- Hero Workspace Data Banner with Metrics -->
+        <div class="bento-card rounded-3xl p-6 sm:p-8 relative overflow-hidden flex flex-col gap-6 border border-zinc-800 shadow-2xl">
           <div class="absolute -top-16 -right-16 w-48 h-48 ${isActive ? 'bg-emerald-500/10' : 'bg-zinc-700/5'} rounded-full blur-3xl pointer-events-none"></div>
 
-          <div class="flex items-start gap-4 sm:gap-5 min-w-0">
-            <div class="w-14 h-14 bg-zinc-800 rounded-2xl flex items-center justify-center border border-zinc-700 text-white font-bold text-xl shadow-inner shrink-0">
-              ${this._getInitials(workspace.name)}
+          <!-- Top Row: Avatar, Info, Status, Edit Button -->
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div class="flex items-start gap-4 sm:gap-5 min-w-0">
+              <div class="w-14 h-14 bg-zinc-800 rounded-2xl flex items-center justify-center border border-zinc-700 text-white font-bold text-xl shadow-inner shrink-0">
+                ${this._getInitials(workspace.name)}
+              </div>
+
+              <div class="min-w-0 space-y-1.5">
+                <div class="flex items-center gap-3 flex-wrap">
+                  <h1 id="workspace-hero-name" class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white truncate" title="${this._escape(workspace.name || `Workspace #${workspace.id}`)}">
+                    ${this._escape(workspace.name || `Workspace #${workspace.id}`)}
+                  </h1>
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${isActive ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-zinc-800 border border-zinc-700 text-zinc-400'} text-[10px] font-bold uppercase tracking-wider">
+                    ${isActive ? '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Active' : 'Offline'}
+                  </span>
+                </div>
+
+                <!-- Metadata Details Row: Created, Service Type, Currency, ID -->
+                <div class="flex flex-wrap items-center gap-3 text-xs text-zinc-400 font-mono">
+                  <div class="flex items-center gap-1.5 text-zinc-300">
+                    <i class="fa-solid fa-calendar-days text-[11px] text-zinc-500"></i>
+                    <span id="workspace-hero-created">Created ${this._formatDate(workspace.createdAt)}</span>
+                  </div>
+                  <span>·</span>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-zinc-500 font-sans">Type:</span>
+                    <span id="workspace-hero-service-type" class="px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-200 border border-zinc-700 text-[11px] font-semibold capitalize font-sans">
+                      ${this._formatServiceType(workspace.serviceType)}
+                    </span>
+                  </div>
+                  <span>·</span>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-zinc-500 font-sans">Currency:</span>
+                    <span id="workspace-hero-currency" class="px-2 py-0.5 rounded-md bg-zinc-800 text-emerald-400 border border-zinc-700 text-[11px] font-bold uppercase">
+                      ${this._escape(workspace.currencyCode || 'USD')}
+                    </span>
+                  </div>
+                  <span>·</span>
+                  <span class="text-zinc-500">ID #${workspace.id}</span>
+                </div>
+              </div>
             </div>
 
-            <div class="min-w-0 space-y-1.5">
-              <div class="flex items-center gap-3 flex-wrap">
-                <h1 id="workspace-hero-name" class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white truncate" title="${this._escape(workspace.name || `Workspace #${workspace.id}`)}">
-                  ${this._escape(workspace.name || `Workspace #${workspace.id}`)}
-                </h1>
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${isActive ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-zinc-800 border border-zinc-700 text-zinc-400'} text-[10px] font-bold uppercase tracking-wider">
-                  ${isActive ? '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Active' : 'Offline'}
-                </span>
-              </div>
-
-              <!-- Metadata Details Row: Created, Service Type, Currency, ID -->
-              <div class="flex flex-wrap items-center gap-3 text-xs text-zinc-400 font-mono">
-                <div class="flex items-center gap-1.5 text-zinc-300">
-                  <i class="fa-solid fa-calendar-days text-[11px] text-zinc-500"></i>
-                  <span id="workspace-hero-created">Created ${this._formatDate(workspace.createdAt)}</span>
-                </div>
-                <span>·</span>
-                <div class="flex items-center gap-1.5">
-                  <span class="text-zinc-500 font-sans">Type:</span>
-                  <span id="workspace-hero-service-type" class="px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-200 border border-zinc-700 text-[11px] font-semibold capitalize font-sans">
-                    ${this._formatServiceType(workspace.serviceType)}
-                  </span>
-                </div>
-                <span>·</span>
-                <div class="flex items-center gap-1.5">
-                  <span class="text-zinc-500 font-sans">Currency:</span>
-                  <span id="workspace-hero-currency" class="px-2 py-0.5 rounded-md bg-zinc-800 text-emerald-400 border border-zinc-700 text-[11px] font-bold uppercase">
-                    ${this._escape(workspace.currencyCode || 'USD')}
-                  </span>
-                </div>
-                <span>·</span>
-                <span class="text-zinc-500">ID #${workspace.id}</span>
-              </div>
+            <!-- Edit Workspace Action Button -->
+            <div class="flex items-center gap-3 shrink-0 self-start md:self-auto z-10">
+              <button 
+                type="button" 
+                id="open-edit-workspace-btn"
+                class="inline-flex items-center gap-2 bg-white hover:bg-zinc-200 text-black px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition transform hover:scale-[1.02] shadow-sm cursor-pointer"
+              >
+                <i class="fa-solid fa-pen-to-square text-xs"></i>
+                <span>Edit Workspace</span>
+              </button>
             </div>
           </div>
 
-          <!-- Edit Workspace Action Button -->
-          <div class="flex items-center gap-3 shrink-0 self-start md:self-auto">
-            <button 
-              type="button" 
-              id="open-edit-workspace-btn"
-              class="inline-flex items-center gap-2 bg-white hover:bg-zinc-200 text-black px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition transform hover:scale-[1.02] shadow-sm cursor-pointer"
-            >
-              <i class="fa-solid fa-pen-to-square text-xs"></i>
-              <span>Edit Workspace</span>
-            </button>
+          <!-- Divider -->
+          <div class="border-t border-zinc-800/80"></div>
+
+          <!-- Bottom Row: 4 Metric Cards for This Workspace -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 z-10 relative">
+            
+            <!-- 1. Total Sales -->
+            <div class="p-4 rounded-2xl bg-[#0d0d10]/80 border border-zinc-800/80 flex flex-col justify-between">
+              <div class="flex items-center justify-between text-zinc-400 mb-2">
+                <span class="text-[11px] font-semibold uppercase tracking-wider">Total Sales</span>
+                <i class="fa-solid fa-sack-dollar text-xs text-emerald-400"></i>
+              </div>
+              <div class="text-xl sm:text-2xl font-extrabold text-white tracking-tight">${metrics.totalSales || '—'}</div>
+              <div class="text-[10px] text-zinc-500 mt-1">${metrics.currency || workspace.currencyCode || 'USD'} revenue</div>
+            </div>
+
+            <!-- 2. Total Messages Count -->
+            <div class="p-4 rounded-2xl bg-[#0d0d10]/80 border border-zinc-800/80 flex flex-col justify-between">
+              <div class="flex items-center justify-between text-zinc-400 mb-2">
+                <span class="text-[11px] font-semibold uppercase tracking-wider">Total Messages</span>
+                <i class="fa-solid fa-comments text-xs text-zinc-300"></i>
+              </div>
+              <div class="text-xl sm:text-2xl font-extrabold text-white tracking-tight">${metrics.messagesCount !== undefined ? metrics.messagesCount : '—'}</div>
+              <div class="text-[10px] text-zinc-500 mt-1">Processed messages</div>
+            </div>
+
+            <!-- 3. DM to Checkouts -->
+            <div class="p-4 rounded-2xl bg-[#0d0d10]/80 border border-zinc-800/80 flex flex-col justify-between">
+              <div class="flex items-center justify-between text-zinc-400 mb-2">
+                <span class="text-[11px] font-semibold uppercase tracking-wider">DM-to-Checkout</span>
+                <i class="fa-solid fa-bag-shopping text-xs text-zinc-300"></i>
+              </div>
+              <div class="text-xl sm:text-2xl font-extrabold text-white tracking-tight">${metrics.dmToCheckout || '—'}</div>
+              <div class="text-[10px] text-zinc-500 mt-1">Conversion rate</div>
+            </div>
+
+            <!-- 4. Total Orders Placed -->
+            <div class="p-4 rounded-2xl bg-[#0d0d10]/80 border border-zinc-800/80 flex flex-col justify-between">
+              <div class="flex items-center justify-between text-zinc-400 mb-2">
+                <span class="text-[11px] font-semibold uppercase tracking-wider">Orders Placed</span>
+                <i class="fa-solid fa-cart-check text-xs text-blue-400"></i>
+              </div>
+              <div class="text-xl sm:text-2xl font-extrabold text-white tracking-tight">${metrics.placedOrdersCount !== undefined ? metrics.placedOrdersCount : '—'}</div>
+              <div class="text-[10px] text-zinc-500 mt-1">Fulfilled orders</div>
+            </div>
+
           </div>
         </div>
 

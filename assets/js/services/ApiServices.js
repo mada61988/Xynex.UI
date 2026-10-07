@@ -379,7 +379,10 @@ export class ApiService {
     return await response.json();
   }
 
-  async fetchWorkspacePlacedOrders(clerkId, workspaceId) {
+  async fetchWorkspacePlacedOrders(param1, param2) {
+    let clerkId = param2 ? param1 : (window.Clerk?.user?.id || null);
+    let workspaceId = param2 ? param2 : param1;
+
     if (!clerkId || !workspaceId) {
       throw new Error("clerkId and workspaceId are required to fetch workspace placed orders");
     }

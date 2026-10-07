@@ -456,6 +456,23 @@ export class DashboardModel {
     return u ? u.role : 'user';
   }
 
+  // --- Convenience Workspace Methods ---
+
+  async fetchWorkspaceTotalSales(workspaceId) {
+    const clerkId = window.Clerk?.user?.id || null;
+    return this.fetchTotalSales({ clerkId, workspaceId });
+  }
+
+  async fetchWorkspaceDmToCheckout(workspaceId) {
+    const clerkId = window.Clerk?.user?.id || null;
+    return this.fetchDmToCheckout({ clerkId, workspaceId });
+  }
+
+  async fetchWorkspacePlacedOrders(workspaceId) {
+    const clerkId = window.Clerk?.user?.id || null;
+    return this.fetchPlacedOrders({ clerkId, workspaceId });
+  }
+  }
   /**
    * Updates channel status using PATCH /channels/:id/status
    */

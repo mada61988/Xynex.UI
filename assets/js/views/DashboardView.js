@@ -1887,6 +1887,21 @@ export class DashboardView {
                 <p class="text-[11px] text-zinc-500 mt-1.5">The ISO currency code for orders and checkouts (e.g. USD, EUR, GBP).</p>
               </div>
 
+              <!-- Meta App ID -->
+              <div>
+                <label for="edit-page-ws-meta-appid" class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
+                  Meta App ID
+                </label>
+                <input 
+                  type="text" 
+                  id="edit-page-ws-meta-appid" 
+                  value="${this._escape(workspace.metaAppId || '')}" 
+                  placeholder="e.g. 1029384756"
+                  class="w-full bg-[#0d0d10] border border-zinc-700 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 rounded-xl px-4 py-2.5 text-sm text-white font-mono transition"
+                />
+                <p class="text-[11px] text-zinc-500 mt-1.5">Enter the Meta App ID associated with this workspace's integrations.</p>
+              </div>
+
               <!-- Connected Channels Section (Delete Channel) -->
               <div class="pt-4 border-t border-zinc-800">
                 <div class="flex items-center justify-between mb-3">
@@ -2004,11 +2019,13 @@ export class DashboardView {
         const nameInput = document.getElementById('edit-page-ws-name');
         const serviceSelect = document.getElementById('edit-page-ws-service-type');
         const currencyInput = document.getElementById('edit-page-ws-currency');
+        const metaAppIdInput = document.getElementById('edit-page-ws-meta-appid');
 
         const updatedData = {
           name: nameInput?.value?.trim() || workspace.name,
           serviceType: serviceSelect?.value || 'product_based',
-          currencyCode: currencyInput?.value?.trim().toUpperCase() || 'USD'
+          currencyCode: currencyInput?.value?.trim().toUpperCase() || 'USD',
+          metaAppId: metaAppIdInput?.value?.trim() || null
         };
 
         if (saveBtn) saveBtn.disabled = true;

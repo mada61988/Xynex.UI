@@ -406,6 +406,7 @@ export class DashboardController {
         workspace.name = updatedData.name;
         workspace.serviceType = updatedData.serviceType;
         workspace.currencyCode = updatedData.currencyCode;
+        workspace.metaAppId = updatedData.metaAppId;
         await this.openWorkspaceDetail(workspace.id);
       },
       onDeleteChannel: async (channelId) => {

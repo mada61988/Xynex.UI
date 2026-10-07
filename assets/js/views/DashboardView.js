@@ -2391,51 +2391,6 @@ export class DashboardView {
       });
     }
   }
-                  Back to ${this._escape(workspace.name || 'Workspace')}
-                </button>
-              </div>
-            </div>
-            
-          </div>
-        </div>
-      </div>
-    `;
-
-    // 3. Attach Event Listeners
-    const toggle = document.getElementById('channel-master-toggle');
-    const statusLabel = document.getElementById('channel-master-status-label');
-    if (toggle) {
-      toggle.addEventListener('change', async () => {
-        const isCurrentlyActive = toggle.dataset.active === 'true';
-        const targetActive = !isCurrentlyActive;
-        toggle.disabled = true;
-
-        try {
-          if (onToggleStatus) {
-            await onToggleStatus(channel.id, targetActive);
-          }
-          toggle.checked = targetActive;
-          toggle.dataset.active = targetActive ? 'true' : 'false';
-          if (statusLabel) {
-            statusLabel.className = `text-[10px] font-semibold ${targetActive ? 'text-emerald-400' : 'text-zinc-500'} tracking-wide uppercase`;
-            statusLabel.textContent = targetActive ? 'Agent Active' : 'Agent Offline';
-          }
-        } catch (err) {
-          console.error("Failed to update channel status:", err);
-          toggle.checked = isCurrentlyActive;
-        } finally {
-          toggle.disabled = false;
-        }
-      });
-    }
-
-    const backBtn = document.getElementById('back-to-channels-list-btn');
-    if (backBtn && onBackToWorkspaceDetail) {
-      backBtn.addEventListener('click', () => onBackToWorkspaceDetail());
-    }
-  }
-
-  renderWorkspacesCardsError(errorMessage, onRetry = null) {
     if (this.workspacesCountBadge) {
       this.workspacesCountBadge.innerHTML = `
         <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>

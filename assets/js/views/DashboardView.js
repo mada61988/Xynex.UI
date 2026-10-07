@@ -1646,7 +1646,7 @@ export class DashboardView {
                   </span>
                 </div>
 
-                <!-- Metadata Details Row: Created, Service Type, Currency, ID -->
+                <!-- Metadata Details Row: Created, Service Type, Currency, Meta App ID, ID -->
                 <div class="flex flex-wrap items-center gap-3 text-xs text-zinc-400 font-mono">
                   <div class="flex items-center gap-1.5 text-zinc-300">
                     <i class="fa-solid fa-calendar-days text-[11px] text-zinc-500"></i>
@@ -1665,6 +1665,11 @@ export class DashboardView {
                     <span id="workspace-hero-currency" class="px-2 py-0.5 rounded-md bg-zinc-800 text-emerald-400 border border-zinc-700 text-[11px] font-bold uppercase">
                       ${this._escape(workspace.currencyCode || 'USD')}
                     </span>
+                  </div>
+                  <span>·</span>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-zinc-500 font-sans">Meta App ID:</span>
+                    <span class="text-zinc-300">${this._escape(workspace.metaAppId || 'N/A')}</span>
                   </div>
                   <span>·</span>
                   <span class="text-zinc-500">ID #${workspace.id}</span>

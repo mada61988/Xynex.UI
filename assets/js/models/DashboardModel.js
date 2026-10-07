@@ -472,7 +472,7 @@ export class DashboardModel {
     const clerkId = window.Clerk?.user?.id || null;
     return this.fetchPlacedOrders({ clerkId, workspaceId });
   }
-  }
+
   /**
    * Updates channel status using PATCH /channels/:id/status
    */

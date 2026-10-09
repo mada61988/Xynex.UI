@@ -56,10 +56,15 @@ export class DashboardController {
     }
     this.startMessagesPolling();
 
-    // 7. Re-fetch if auth state updates dynamically
+
+// 7. Re-fetch ONLY if the authenticated user actually changes
     if (this.authModel) {
+      let currentUserId = this.authModel?.user?.id || window.Clerk?.user?.id;
+
       this.authModel.onAuthStateChange(async ({ user }) => {
-        if (user && user.id) {
+        // Only trigger loading overlay if user.id exists AND is different from currentUserId
+        if (user && user.id && user.id !== currentUserId) {
+          currentUserId = user.id;
           this.view.showPageLoading("Updating session data...");
           try {
             await Promise.allSettled([

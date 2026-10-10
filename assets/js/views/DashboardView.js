@@ -44,6 +44,11 @@ export class DashboardView {
     this.btnAddWorkspace = document.getElementById('btn-add-workspace');
     this.onAddWorkspaceCallback = null;
 
+    // Create Channel elements & callbacks
+    this.createChannelSection = document.getElementById('section-create-channel');
+    this.formCreateChannel = document.getElementById('form-create-channel');
+    this.onOpenCreateChannelCallback = null;
+
     // Callbacks for role editing
     this.onEditRoleClick = null;
     this.onSaveRoleClick = null;
@@ -232,6 +237,189 @@ export class DashboardView {
     });
   }
 
+  openCreateChannelView(workspace) {
+    const wsIdInput = document.getElementById('create-channel-workspace-id');
+    const backBtnLabel = document.getElementById('back-to-workspace-detail-label');
+
+    if (wsIdInput) wsIdInput.value = workspace.id;
+    if (backBtnLabel) backBtnLabel.textContent = `Back to ${workspace.name || `Workspace #${workspace.id}`}`;
+
+    this.renderHeaderBreadcrumbs([
+      { label: 'Workspaces', target: 'workspaces', action: 'workspaces', icon: '<i class="fa-solid fa-briefcase text-xs text-zinc-400"></i>' },
+      { label: workspace.name || `Workspace #${workspace.id}`, target: 'workspace-detail', action: 'workspace-detail', workspaceId: workspace.id },
+      { label: 'Create Channel', icon: '<i class="fa-solid fa-circle-nodes text-xs text-white"></i>' }
+    ]);
+
+    this.resetCreateChannelForm();
+    this.showSection('create-channel');
+  }
+
+  bindCreateChannel({ onSubmit, onCancel }) {
+    const form = document.getElementById('form-create-channel');
+    const wsIdInput = document.getElementById('create-channel-workspace-id');
+    const platformSelect = document.getElementById('create-channel-platform');
+    const platformIcon = document.getElementById('create-channel-platform-icon');
+    const pageIdInput = document.getElementById('create-channel-page-id');
+    const tokenInput = document.getElementById('create-channel-access-token');
+    const toggleTokenBtn = document.getElementById('toggle-channel-token-visibility-btn');
+    const submitBtn = document.getElementById('create-channel-submit-btn');
+    const cancelBtn = document.getElementById('back-to-workspace-detail-btn');
+
+    if (!form || !submitBtn) return;
+
+    // Platform icon updater
+    const updatePlatformIcon = () => {
+      const val = platformSelect.value;
+      if (platformIcon) {
+        switch (val) {
+          case 'instagram':
+            platformIcon.innerHTML = `<i class="fa-brands fa-instagram text-pink-500"></i>`;
+            break;
+          case 'facebook':
+            platformIcon.innerHTML = `<i class="fa-brands fa-facebook text-blue-500"></i>`;
+            break;
+          case 'whatsapp':
+            platformIcon.innerHTML = `<i class="fa-brands fa-whatsapp text-emerald-400"></i>`;
+            break;
+          case 'telegram':
+            platformIcon.innerHTML = `<i class="fa-brands fa-telegram text-sky-400"></i>`;
+            break;
+          case 'webchat':
+            platformIcon.innerHTML = `<i class="fa-solid fa-comments text-amber-400"></i>`;
+            break;
+          default:
+            platformIcon.innerHTML = `<i class="fa-solid fa-circle-nodes text-zinc-400"></i>`;
+        }
+      }
+    };
+
+    // Real-time validation
+    const checkFormValidity = () => {
+      const platform = platformSelect.value;
+      const pageId = pageIdInput.value.trim();
+      const token = tokenInput.value.trim();
+      const isValid = Boolean(platform && pageId && token);
+
+      if (isValid && !submitBtn.dataset.loading) {
+        submitBtn.disabled = false;
+        submitBtn.className = "w-full sm:w-auto px-7 py-3 rounded-xl font-semibold bg-white hover:bg-zinc-200 text-black text-xs sm:text-sm transition transform hover:scale-[1.02] shadow-lg flex items-center justify-center gap-2 cursor-pointer";
+      } else {
+        submitBtn.disabled = true;
+        submitBtn.className = "w-full sm:w-auto px-7 py-3 rounded-xl font-semibold bg-zinc-800 text-zinc-500 opacity-40 cursor-not-allowed border border-zinc-700 text-xs sm:text-sm transition flex items-center justify-center gap-2";
+      }
+    };
+
+    if (platformSelect) {
+      platformSelect.addEventListener('change', () => {
+        updatePlatformIcon();
+        checkFormValidity();
+      });
+    }
+
+    [pageIdInput, tokenInput].forEach(el => {
+      if (el) el.addEventListener('input', checkFormValidity);
+    });
+
+    if (toggleTokenBtn && tokenInput) {
+      toggleTokenBtn.addEventListener('click', () => {
+        const type = tokenInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        tokenInput.setAttribute('type', type);
+        toggleTokenBtn.innerHTML = type === 'password'
+          ? '<i class="fa-regular fa-eye text-xs"></i>'
+          : '<i class="fa-regular fa-eye-slash text-xs"></i>';
+      });
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (submitBtn.disabled) return;
+
+      const payload = {
+        workspaceId: Number(wsIdInput.value) || wsIdInput.value,
+        platform: platformSelect.value,
+        metaPageId: pageIdInput.value.trim(),
+        pageAccessToken: tokenInput.value.trim()
+      };
+
+      if (onSubmit) onSubmit(payload);
+    });
+
+    if (cancelBtn && onCancel) {
+      cancelBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        onCancel();
+      });
+    }
+  }
+
+  setCreateChannelLoading(isLoading) {
+    const submitBtn = document.getElementById('create-channel-submit-btn');
+    if (!submitBtn) return;
+
+    if (isLoading) {
+      submitBtn.dataset.loading = "true";
+      submitBtn.disabled = true;
+      submitBtn.className = "w-full sm:w-auto px-7 py-3 rounded-xl font-semibold bg-zinc-800 text-white opacity-80 cursor-wait border border-zinc-700 text-xs sm:text-sm transition flex items-center justify-center gap-2";
+      submitBtn.innerHTML = `
+        <svg class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>Connecting Channel...</span>
+      `;
+    } else {
+      delete submitBtn.dataset.loading;
+      submitBtn.innerHTML = `
+        <i class="fa-solid fa-plus text-xs"></i>
+        <span>Create Channel</span>
+      `;
+      const pageIdInput = document.getElementById('create-channel-page-id');
+      if (pageIdInput) pageIdInput.dispatchEvent(new Event('input'));
+    }
+  }
+
+  showCreateChannelFeedback({ type, message }) {
+    const fb = document.getElementById('create-channel-feedback');
+    if (!fb) return;
+
+    fb.classList.remove('hidden');
+    if (type === 'success') {
+      fb.className = "mb-6 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3";
+      fb.innerHTML = `
+        <i class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span class="text-xs font-semibold text-emerald-300">${this._escape(message)}</span>
+      `;
+    } else {
+      fb.className = "mb-6 px-4 py-3 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center gap-3";
+      fb.innerHTML = `
+        <i class="fa-solid fa-circle-exclamation text-rose-400"></i>
+        <span class="text-xs font-semibold text-rose-300">${this._escape(message)}</span>
+      `;
+    }
+  }
+
+  resetCreateChannelForm() {
+    const form = document.getElementById('form-create-channel');
+    if (form) form.reset();
+
+    const fb = document.getElementById('create-channel-feedback');
+    if (fb) fb.classList.add('hidden');
+
+    const icon = document.getElementById('create-channel-platform-icon');
+    if (icon) icon.innerHTML = `<i class="fa-solid fa-circle-nodes text-zinc-400"></i>`;
+
+    const submitBtn = document.getElementById('create-channel-submit-btn');
+    if (submitBtn) {
+      delete submitBtn.dataset.loading;
+      submitBtn.disabled = true;
+      submitBtn.className = "w-full sm:w-auto px-7 py-3 rounded-xl font-semibold bg-zinc-800 text-zinc-500 opacity-40 cursor-not-allowed border border-zinc-700 text-xs sm:text-sm transition flex items-center justify-center gap-2";
+      submitBtn.innerHTML = `
+        <i class="fa-solid fa-plus text-xs"></i>
+        <span>Create Channel</span>
+      `;
+    }
+  }
+
   _bindWorkspacesDropdownEvents() {
     if (this.workspacesBtn && this.workspacesMenu) {
       this.workspacesBtn.addEventListener('click', (e) => {
@@ -348,7 +536,7 @@ export class DashboardView {
   }
 
   setActiveSidebarLink(targetSection) {
-    const effectiveSection = (targetSection === 'create-workspace' || targetSection === 'workspace-detail') ? 'workspaces' : targetSection;
+    const effectiveSection = (targetSection === 'create-workspace' || targetSection === 'workspace-detail' || targetSection === 'create-channel') ? 'workspaces' : targetSection;
     this.sidebarLinks.forEach(link => {
       const href = link.getAttribute('href');
       const isTarget = href === `#${effectiveSection}`;
@@ -369,6 +557,7 @@ export class DashboardView {
     if (this.workspacesSection) this.workspacesSection.classList.add('hidden');
     if (this.workspaceDetailSection) this.workspaceDetailSection.classList.add('hidden');
     if (this.createWorkspaceSection) this.createWorkspaceSection.classList.add('hidden');
+    if (this.createChannelSection) this.createChannelSection.classList.add('hidden');
 
     const isOverview = (sectionName === 'overview' || !sectionName || sectionName === '');
 
@@ -390,6 +579,8 @@ export class DashboardView {
         { label: 'Workspaces', icon: '<i class="fa-solid fa-briefcase text-xs text-zinc-400"></i>', target: 'workspaces' },
         { label: 'Create Workspace', icon: '<i class="fa-solid fa-square-plus text-xs text-white"></i>' }
       ]);
+    } else if (sectionName === 'create-channel') {
+      if (this.createChannelSection) this.createChannelSection.classList.remove('hidden');
     } else {
       if (this.overviewSection) this.overviewSection.classList.remove('hidden');
       this.renderHeaderBreadcrumbs([]);
@@ -1772,7 +1963,7 @@ export class DashboardView {
     });
   }
 
-  renderWorkspaceDetailView(workspace, channels, metrics = {}, { onBackToWorkspaces, onConfigureChannel, onOpenEditWorkspace }) {
+  renderWorkspaceDetailView(workspace, channels, metrics = {}, { onBackToWorkspaces, onConfigureChannel, onOpenEditWorkspace, onOpenCreateChannel }) {
     if (!this.workspaceDetailContent) return;
 
     const isActive = String(workspace.status || '').toLowerCase() === 'active';
@@ -1819,7 +2010,15 @@ export class DashboardView {
         <div class="col-span-full bento-card rounded-2xl p-10 flex flex-col items-center justify-center text-center text-zinc-400">
           <i class="fa-solid fa-circle-nodes text-3xl mb-2 text-zinc-600"></i>
           <p class="text-sm font-semibold">No channels configured</p>
-          <p class="text-xs text-zinc-500 mt-0.5">There are no messaging platforms currently connected to this workspace.</p>
+          <p class="text-xs text-zinc-500 mt-0.5 mb-4">There are no messaging platforms currently connected to this workspace.</p>
+          <button 
+            type="button" 
+            class="btn-create-channel-empty inline-flex items-center gap-2 bg-white hover:bg-zinc-200 text-black px-4 py-2 rounded-xl text-xs font-semibold transition transform hover:scale-[1.02] cursor-pointer"
+            data-workspace-id="${workspace.id}"
+          >
+            <i class="fa-solid fa-plus text-xs"></i>
+            <span>Create Channel</span>
+          </button>
         </div>
       `;
 
@@ -1950,17 +2149,28 @@ export class DashboardView {
 
         <!-- Connected Channels Section -->
         <div class="space-y-4">
-          <div class="flex items-center justify-between pb-1">
+          <div class="flex items-center justify-between pb-1 flex-wrap gap-3">
             <div>
               <h2 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
                 <span>Connected Channels</span>
               </h2>
               <p class="text-xs text-zinc-400 mt-0.5">Integrations routing conversations and checkout events for this storefront.</p>
             </div>
-            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#111114] border border-zinc-800 text-xs text-zinc-300 font-mono">
-              <i class="fa-solid fa-circle-nodes text-xs text-zinc-400"></i>
-              <span id="workspace-channels-count-text">${channelsList.length} ${channelsList.length === 1 ? 'Channel' : 'Channels'}</span>
-            </span>
+            <div class="flex items-center gap-3">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#111114] border border-zinc-800 text-xs text-zinc-300 font-mono">
+                <i class="fa-solid fa-circle-nodes text-xs text-zinc-400"></i>
+                <span id="workspace-channels-count-text">${channelsList.length} ${channelsList.length === 1 ? 'Channel' : 'Channels'}</span>
+              </span>
+              <button 
+                type="button" 
+                id="btn-create-channel"
+                class="inline-flex items-center gap-2 bg-white hover:bg-zinc-200 text-black px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition transform hover:scale-[1.02] shadow-sm cursor-pointer"
+                data-workspace-id="${workspace.id}"
+              >
+                <i class="fa-solid fa-plus text-xs"></i>
+                <span>Create Channel</span>
+              </button>
+            </div>
           </div>
 
           <!-- Channels Grid (2 Columns per inspiration) -->
@@ -1976,6 +2186,17 @@ export class DashboardView {
     if (editBtn && onOpenEditWorkspace) {
       editBtn.addEventListener('click', () => onOpenEditWorkspace());
     }
+
+    const createChannelBtn = document.getElementById('btn-create-channel');
+    if (createChannelBtn && onOpenCreateChannel) {
+      createChannelBtn.addEventListener('click', () => onOpenCreateChannel(workspace));
+    }
+
+    this.workspaceDetailContent.querySelectorAll('.btn-create-channel-empty').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (onOpenCreateChannel) onOpenCreateChannel(workspace);
+      });
+    });
 
     this.workspaceDetailContent.querySelectorAll('.configure-channel-btn').forEach(btn => {
       btn.addEventListener('click', () => {

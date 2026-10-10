@@ -39,7 +39,20 @@ export class DashboardController {
       this.handleNavigation('create-workspace');
     });
 
-    // 3c. Header breadcrumb navigation handler
+    // 3c. Delegate Create Channel form
+    this.view.bindCreateChannel({
+      onSubmit: this.handleCreateChannel.bind(this),
+      onCancel: () => {
+        if (this.currentDetailWorkspace) {
+          this.openWorkspaceDetail(this.currentDetailWorkspace.id);
+        } else {
+          window.location.hash = 'workspaces';
+          this.handleNavigation('workspaces');
+        }
+      }
+    });
+
+    // 3d. Header breadcrumb navigation handler
     this.view.onBreadcrumbNavigate = (target, workspaceId) => {
       if (target === 'workspaces') {
         window.location.hash = 'workspaces';
@@ -418,6 +431,7 @@ export class DashboardController {
         placedOrdersCount: ordersRes.status === 'fulfilled' ? (Array.isArray(ordersRes.value) ? ordersRes.value.length : (ordersRes.value?.count ?? ordersRes.value ?? 0)) : '—'
       };
 
+      this.currentDetailWorkspace = workspace;
       this.view.showSection('workspace-detail');
       this.view.renderWorkspaceDetailView(workspace, channels, metrics, {
         onBackToWorkspaces: () => {
@@ -433,12 +447,42 @@ export class DashboardController {
         },
         onOpenEditWorkspace: () => {
           this.openEditWorkspace(workspace, channels);
+        },
+        onOpenCreateChannel: (ws) => {
+          this.openCreateChannel(ws || workspace);
         }
       });
     } catch (err) {
       console.error("DashboardController: Error opening workspace detail:", err);
     } finally {
       this.view.hidePageLoading();
+    }
+  }
+
+  openCreateChannel(workspace) {
+    this.currentDetailWorkspace = workspace;
+    this.view.openCreateChannelView(workspace);
+  }
+
+  async handleCreateChannel(payload) {
+    this.view.setCreateChannelLoading(true);
+    try {
+      await this.model.createChannel(payload);
+      this.view.showCreateChannelFeedback({ type: 'success', message: 'Channel connected successfully!' });
+
+      // Refresh workspaces/channels cache
+      await this.loadProfilesMetric();
+
+      // Return to workspace detail view
+      setTimeout(() => {
+        this.view.resetCreateChannelForm();
+        this.openWorkspaceDetail(payload.workspaceId);
+      }, 1500);
+    } catch (err) {
+      console.error("DashboardController: Error creating channel:", err);
+      const serverMessage = err.serverMessage || err.message || "Failed to create channel";
+      this.view.showCreateChannelFeedback({ type: 'error', message: serverMessage });
+      this.view.setCreateChannelLoading(false);
     }
   }
 

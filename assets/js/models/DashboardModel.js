@@ -372,6 +372,13 @@ export class DashboardModel {
     return newWorkspace;
   }
 
+  async createChannel(channelData) {
+    const newChannel = await this.apiService.createChannel(channelData);
+    // Invalidate cached workspaces so fresh channels are loaded on next load
+    this.cachedUserWorkspaces = null;
+    return newChannel;
+  }
+
   async fetchUserProfiles(clerkId) {
     return this.fetchUserWorkspaces(clerkId);
   }

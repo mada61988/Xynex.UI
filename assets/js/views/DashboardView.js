@@ -1,3 +1,5 @@
+import { getAppUrl } from '../config.js';
+
 export class DashboardView {
   constructor() {
     this.sidebar = document.getElementById('sidebar');
@@ -42,6 +44,22 @@ export class DashboardView {
     this.onSaveRoleClick = null;
 
     this._bindWorkspacesDropdownEvents();
+    this._bindSidebarLogout();
+  }
+
+  _bindSidebarLogout() {
+    const logoutBtn = document.getElementById('sidebar-logout-btn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        if (window.Clerk) {
+          try {
+            await window.Clerk.signOut();
+          } catch (_) {}
+        }
+        window.location.href = getAppUrl('signin.html');
+      });
+    }
   }
 
   showPageLoading(message = "Syncing workspace data...") {

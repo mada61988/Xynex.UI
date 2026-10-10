@@ -13,10 +13,9 @@ export class AuthView {
         borderRadius: '0.75rem',
       },
       elements: {
-        watermark: '!hidden',
-        // Strip out shadows and borders so it blends seamlessly
-        cardBox: 'w-full !m-0 !p-0 !bg-transparent !shadow-none !border-none',
-        card: 'w-full !m-0 !p-0 !bg-transparent !shadow-none !border-none',
+        watermark: 'hidden',
+        cardBox: 'w-full m-0 p-0 bg-transparent shadow-none border-none',
+        card: 'w-full m-0 p-0 bg-transparent shadow-none border-none',
         rootBox: 'w-full flex justify-center',
         headerTitle: 'hidden',
         headerSubtitle: 'hidden',
@@ -31,13 +30,35 @@ export class AuthView {
     };
   }
 
-  mountSignIn(clerk) {
+  async mountSignIn(clerk) {
     const container = document.getElementById('sign-in-container');
-    if (container && clerk) {
-      container.innerHTML = ''; // Clear spinner
-      const dashboardUrl = getAppUrl('dashboard.html');
-      const signUpUrl = getAppUrl('signup.html');
+    if (!container) return;
 
+    if (!clerk) {
+      container.innerHTML = `
+        <div class="text-center p-6 text-zinc-400">
+          <p class="text-sm font-semibold text-rose-400 mb-1.5">Authentication Service Unavailable</p>
+          <p class="text-xs text-zinc-500 mb-4">Could not load Clerk SDK. Please check your network connection.</p>
+          <button onclick="window.location.reload()" class="px-4 py-2 rounded-xl bg-white text-black text-xs font-semibold hover:bg-zinc-200 transition cursor-pointer">Retry</button>
+        </div>
+      `;
+      return;
+    }
+
+    // Ensure clerk components are ready
+    if (typeof clerk.load === 'function' && !clerk.loaded) {
+      try {
+        await clerk.load();
+      } catch (e) {
+        console.warn("clerk.load wait notice in mountSignIn:", e);
+      }
+    }
+
+    container.innerHTML = ''; // Clear loading spinner
+    const dashboardUrl = getAppUrl('dashboard.html');
+    const signUpUrl = getAppUrl('signup.html');
+
+    try {
       clerk.mountSignIn(container, { 
         appearance: this.clerkAppearance,
         afterSignInUrl: dashboardUrl,
@@ -46,16 +67,47 @@ export class AuthView {
         forceRedirectUrl: dashboardUrl,
         signUpUrl: signUpUrl
       });
+    } catch (err) {
+      console.error("Clerk mountSignIn failed:", err);
+      container.innerHTML = `
+        <div class="text-center p-6 text-zinc-400">
+          <p class="text-sm font-semibold text-rose-400 mb-1.5">Failed to render Sign In form</p>
+          <p class="text-xs text-zinc-500 mb-4">${err.message || 'Please reload the page.'}</p>
+          <button onclick="window.location.reload()" class="px-4 py-2 rounded-xl bg-white text-black text-xs font-semibold hover:bg-zinc-200 transition cursor-pointer">Reload Page</button>
+        </div>
+      `;
     }
   }
 
-  mountSignUp(clerk) {
+  async mountSignUp(clerk) {
     const container = document.getElementById('sign-up-container');
-    if (container && clerk) {
-      container.innerHTML = ''; // Clear spinner
-      const dashboardUrl = getAppUrl('dashboard.html');
-      const signInUrl = getAppUrl('signin.html');
+    if (!container) return;
 
+    if (!clerk) {
+      container.innerHTML = `
+        <div class="text-center p-6 text-zinc-400">
+          <p class="text-sm font-semibold text-rose-400 mb-1.5">Authentication Service Unavailable</p>
+          <p class="text-xs text-zinc-500 mb-4">Could not load Clerk SDK. Please check your network connection.</p>
+          <button onclick="window.location.reload()" class="px-4 py-2 rounded-xl bg-white text-black text-xs font-semibold hover:bg-zinc-200 transition cursor-pointer">Retry</button>
+        </div>
+      `;
+      return;
+    }
+
+    // Ensure clerk components are ready
+    if (typeof clerk.load === 'function' && !clerk.loaded) {
+      try {
+        await clerk.load();
+      } catch (e) {
+        console.warn("clerk.load wait notice in mountSignUp:", e);
+      }
+    }
+
+    container.innerHTML = ''; // Clear loading spinner
+    const dashboardUrl = getAppUrl('dashboard.html');
+    const signInUrl = getAppUrl('signin.html');
+
+    try {
       clerk.mountSignUp(container, { 
         appearance: this.clerkAppearance,
         afterSignInUrl: dashboardUrl,
@@ -64,6 +116,15 @@ export class AuthView {
         forceRedirectUrl: dashboardUrl,
         signInUrl: signInUrl
       });
+    } catch (err) {
+      console.error("Clerk mountSignUp failed:", err);
+      container.innerHTML = `
+        <div class="text-center p-6 text-zinc-400">
+          <p class="text-sm font-semibold text-rose-400 mb-1.5">Failed to render Sign Up form</p>
+          <p class="text-xs text-zinc-500 mb-4">${err.message || 'Please reload the page.'}</p>
+          <button onclick="window.location.reload()" class="px-4 py-2 rounded-xl bg-white text-black text-xs font-semibold hover:bg-zinc-200 transition cursor-pointer">Reload Page</button>
+        </div>
+      `;
     }
   }
 
@@ -71,16 +132,20 @@ export class AuthView {
     const container = document.getElementById('user-button');
     if (container && clerk) {
       const homeUrl = getAppUrl('index.html');
-      clerk.mountUserButton(container, {
-        afterSignOutUrl: homeUrl,
-        appearance: {
-          variables: this.clerkAppearance.variables,
-          elements: { 
-            userButtonPopoverCard: 'bg-[#111114] border border-zinc-800 shadow-2xl rounded-2xl',
-            userButtonAvatarBox: 'w-8 h-8 rounded-full border border-zinc-700 hover:opacity-80 transition'
+      try {
+        clerk.mountUserButton(container, {
+          afterSignOutUrl: homeUrl,
+          appearance: {
+            variables: this.clerkAppearance.variables,
+            elements: { 
+              userButtonPopoverCard: 'bg-[#111114] border border-zinc-800 shadow-2xl rounded-2xl',
+              userButtonAvatarBox: 'w-8 h-8 rounded-full border border-zinc-700 hover:opacity-80 transition'
+            }
           }
-        }
-      });
+        });
+      } catch (err) {
+        console.warn("Clerk mountUserButton warning:", err);
+      }
     }
   }
 }

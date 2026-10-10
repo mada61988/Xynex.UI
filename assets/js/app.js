@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   const path = window.location.pathname;
+  const isDashboard = path.includes('dashboard.html') || path.endsWith('/dashboard');
 
   // 1. Core Authentication & Route Protection (Required on all pages)
   const authModel = new AuthModel();
@@ -24,6 +25,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     await authController.init(path);
   } catch (err) {
     console.error("Auth init error:", err);
+  }
+
+  // If redirecting unauthenticated visitor away from dashboard, avoid running dashboard controllers
+  if (isDashboard && !authModel.user) {
+    return;
   }
 
   // 2. Landing Page Layout (Dock & Drawer)

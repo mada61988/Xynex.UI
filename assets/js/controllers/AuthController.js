@@ -11,7 +11,6 @@ export class AuthController {
       await this.model.init();
     } catch (e) {
       console.error("Auth init failed:", e);
-      return;
     }
 
     const isDashboard = path.includes('dashboard.html') || path.endsWith('/dashboard');
@@ -25,10 +24,8 @@ export class AuthController {
     if (!this.model.user && isDashboard) {
       const overlayText = document.getElementById('page-loading-text');
       if (overlayText) overlayText.textContent = "Redirecting to Sign In...";
-      setTimeout(() => {
-        const overlay = document.getElementById('page-loading-overlay');
-        if (overlay) overlay.classList.add('hidden');
-      }, 2500);
+      const overlay = document.getElementById('page-loading-overlay');
+      if (overlay) overlay.classList.remove('hidden');
       window.location.href = signinUrl;
       return;
     }
@@ -53,9 +50,9 @@ export class AuthController {
 
     // Orchestrate views based on current path
     if (isSignIn) {
-      this.view.mountSignIn(this.model.clerk);
+      await this.view.mountSignIn(this.model.clerk);
     } else if (isSignUp) {
-      this.view.mountSignUp(this.model.clerk);
+      await this.view.mountSignUp(this.model.clerk);
     } else if (isDashboard) {
       this.view.mountUserButton(this.model.clerk);
     }

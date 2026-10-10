@@ -9,6 +9,7 @@ export class AuthModel {
   async init() {
     if (this.isReady) return;
 
+    // 1. Wait for window.Clerk SDK script to be available
     if (!window.Clerk) {
       await new Promise((resolve) => {
         let attempts = 0;
@@ -17,7 +18,7 @@ export class AuthModel {
           if (window.Clerk) {
             clearInterval(interval);
             resolve();
-          } else if (attempts > 200) { // Timeout after 10 seconds
+          } else if (attempts > 140) { // Timeout after 7 seconds
             clearInterval(interval);
             resolve();
           }
@@ -32,15 +33,16 @@ export class AuthModel {
 
     this.clerk = window.Clerk;
 
+    // 2. Initialize Clerk SDK cleanly
     try {
       const dashboardUrl = getAppUrl('dashboard.html');
       const homeUrl = getAppUrl('index.html');
       const signInUrl = getAppUrl('signin.html');
       const signUpUrl = getAppUrl('signup.html');
 
-      const clerkLoadPromise = this.clerk.load({
+      // Call clerk.load and allow it to finish properly
+      await this.clerk.load({
         publishableKey: CONFIG.CLERK_PUBLISHABLE_KEY,
-        allowedRedirectOrigins: [window.location.origin, 'http://localhost:3000', 'http://localhost:5500', 'https://mada61988.github.io'],
         afterSignInUrl: dashboardUrl,
         afterSignUpUrl: dashboardUrl,
         afterSignOutUrl: homeUrl,
@@ -48,15 +50,13 @@ export class AuthModel {
         signUpUrl: signUpUrl
       });
 
-      // Never allow clerk.load to block or hang the app
-      await Promise.race([
-        clerkLoadPromise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Clerk load timed out")), 3500))
-      ]);
-
       this.isReady = true;
     } catch (error) {
       console.warn("Clerk load notice:", error.message || error);
+      // If clerk has initialized user or state despite notice, mark ready
+      if (this.clerk && (this.clerk.user || this.clerk.loaded)) {
+        this.isReady = true;
+      }
     }
   }
 

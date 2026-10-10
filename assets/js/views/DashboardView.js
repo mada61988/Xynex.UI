@@ -39,6 +39,11 @@ export class DashboardView {
     this.modalContainer = document.getElementById('modal-container');
     this.onBreadcrumbNavigate = null;
 
+    // Create Workspace elements & callbacks
+    this.createWorkspaceSection = document.getElementById('section-create-workspace');
+    this.btnAddWorkspace = document.getElementById('btn-add-workspace');
+    this.onAddWorkspaceCallback = null;
+
     // Callbacks for role editing
     this.onEditRoleClick = null;
     this.onSaveRoleClick = null;
@@ -212,6 +217,21 @@ export class DashboardView {
     }
   }
 
+  bindAddWorkspace(handler) {
+    this.onAddWorkspaceCallback = handler;
+
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('#btn-add-workspace, [data-action="add-workspace"]');
+      if (btn) {
+        e.preventDefault();
+        if (this.workspacesMenu) {
+          this.workspacesMenu.classList.add('hidden');
+        }
+        handler();
+      }
+    });
+  }
+
   _bindWorkspacesDropdownEvents() {
     if (this.workspacesBtn && this.workspacesMenu) {
       this.workspacesBtn.addEventListener('click', (e) => {
@@ -228,6 +248,17 @@ export class DashboardView {
 
     if (this.workspacesList) {
       this.workspacesList.addEventListener('click', (e) => {
+        const addBtn = e.target.closest('[data-action="add-workspace"]');
+        if (addBtn) {
+          if (this.workspacesMenu) {
+            this.workspacesMenu.classList.add('hidden');
+          }
+          if (this.onAddWorkspaceCallback) {
+            this.onAddWorkspaceCallback();
+          }
+          return;
+        }
+
         const item = e.target.closest('.workspace-item');
         if (item) {
           const workspaceId = item.dataset.workspaceId === 'all' ? 'all' : (Number(item.dataset.workspaceId) || item.dataset.workspaceId);
@@ -317,9 +348,10 @@ export class DashboardView {
   }
 
   setActiveSidebarLink(targetSection) {
+    const effectiveSection = (targetSection === 'create-workspace' || targetSection === 'workspace-detail') ? 'workspaces' : targetSection;
     this.sidebarLinks.forEach(link => {
       const href = link.getAttribute('href');
-      const isTarget = href === `#${targetSection}`;
+      const isTarget = href === `#${effectiveSection}`;
 
       if (isTarget) {
         link.classList.add('active', 'text-white', 'font-semibold');
@@ -336,6 +368,7 @@ export class DashboardView {
     if (this.usersSection) this.usersSection.classList.add('hidden');
     if (this.workspacesSection) this.workspacesSection.classList.add('hidden');
     if (this.workspaceDetailSection) this.workspaceDetailSection.classList.add('hidden');
+    if (this.createWorkspaceSection) this.createWorkspaceSection.classList.add('hidden');
 
     const isOverview = (sectionName === 'overview' || !sectionName || sectionName === '');
 
@@ -347,10 +380,16 @@ export class DashboardView {
     } else if (sectionName === 'workspaces' || sectionName === 'chatbots') {
       if (this.workspacesSection) this.workspacesSection.classList.remove('hidden');
       this.renderHeaderBreadcrumbs([
-        { label: 'Workspaces', icon: '<i class="fa-solid fa-layer-group text-xs text-zinc-400"></i>' }
+        { label: 'Workspaces', icon: '<i class="fa-solid fa-briefcase text-xs text-zinc-400"></i>' }
       ]);
     } else if (sectionName === 'workspace-detail') {
       if (this.workspaceDetailSection) this.workspaceDetailSection.classList.remove('hidden');
+    } else if (sectionName === 'create-workspace') {
+      if (this.createWorkspaceSection) this.createWorkspaceSection.classList.remove('hidden');
+      this.renderHeaderBreadcrumbs([
+        { label: 'Workspaces', icon: '<i class="fa-solid fa-briefcase text-xs text-zinc-400"></i>', target: 'workspaces' },
+        { label: 'Create Workspace', icon: '<i class="fa-solid fa-square-plus text-xs text-white"></i>' }
+      ]);
     } else {
       if (this.overviewSection) this.overviewSection.classList.remove('hidden');
       this.renderHeaderBreadcrumbs([]);
@@ -656,7 +695,16 @@ export class DashboardView {
       `;
     }).join('');
 
-    this.workspacesList.innerHTML = allOptionHtml + profilesHtml;
+    const addWorkspaceFooterHtml = `
+      <div class="pt-1.5 mt-1 border-t border-zinc-800/80">
+        <button type="button" data-action="add-workspace" class="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-xs font-semibold text-white transition cursor-pointer">
+          <i class="fa-solid fa-plus text-xs"></i>
+          <span>Add Workspace</span>
+        </button>
+      </div>
+    `;
+
+    this.workspacesList.innerHTML = allOptionHtml + profilesHtml + addWorkspaceFooterHtml;
   }
 
   renderChannelsDropdown(profiles, errorMessage = null) {

@@ -27,13 +27,26 @@ export class DashboardController {
     // 3a. Delegate Create Workspace form
     this.view.bindCreateWorkspace({
       onSubmit: this.handleCreateWorkspace.bind(this),
-      onCancel: () => this.handleNavigation('workspaces')
+      onCancel: () => {
+        window.location.hash = 'workspaces';
+        this.handleNavigation('workspaces');
+      }
     });
 
-    // 3b. Header breadcrumb navigation handler
+    // 3b. Delegate Add Workspace button click
+    this.view.bindAddWorkspace(() => {
+      window.location.hash = 'create-workspace';
+      this.handleNavigation('create-workspace');
+    });
+
+    // 3c. Header breadcrumb navigation handler
     this.view.onBreadcrumbNavigate = (target, workspaceId) => {
       if (target === 'workspaces') {
+        window.location.hash = 'workspaces';
         this.handleNavigation('workspaces');
+      } else if (target === 'create-workspace') {
+        window.location.hash = 'create-workspace';
+        this.handleNavigation('create-workspace');
       } else if (target === 'workspace-detail' && workspaceId) {
         this.openWorkspaceDetail(workspaceId);
       }
@@ -100,6 +113,7 @@ export class DashboardController {
       // Transition back to workspaces tab after brief delay
       setTimeout(() => {
         this.view.resetCreateWorkspaceForm();
+        window.location.hash = 'workspaces';
         this.handleNavigation('workspaces');
       }, 1500);
     } catch (err) {

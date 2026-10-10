@@ -522,6 +522,7 @@ export class DashboardModel {
    */
   async deleteChannel(channelId) {
     const res = await this.apiService.deleteChannel(channelId);
+    this.cachedUserWorkspaces = null;
     return res;
   }
 }

@@ -539,6 +539,15 @@ export class DashboardController {
           ch.pageAccessToken = updatedData.pageAccessToken;
         }
         await this.openWorkspaceDetail(workspace.id);
+      },
+      onDeleteChannel: async (channelId) => {
+        await this.model.deleteChannel(channelId);
+        const idx = (allChannels || []).findIndex(c => Number(c.id) === Number(channelId));
+        if (idx !== -1) {
+          allChannels.splice(idx, 1);
+        }
+        await this.loadProfilesMetric();
+        await this.openWorkspaceDetail(workspace.id);
       }
     });
   }

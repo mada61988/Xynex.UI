@@ -1,5 +1,5 @@
 export const CONFIG = {
-  CLERK_PUBLISHABLE_KEY: window.clerkPublishableKey || "pk_test_cmVsZXZhbnQtcGFuZ29saW4tMzg2LmNsZXJrLmFjY291bnRzLmRldiQ",
+  CLERK_PUBLISHABLE_KEY: (typeof window !== 'undefined' && window.clerkPublishableKey) || "pk_test_cmVsZXZhbnQtcGFuZ29saW4tMzg2LmNsZXJrLmFjY291bnRzLmRldiQ",
   API_BASE_URL: 'https://x5xpswzc-9000.euw.devtunnels.ms'
 };
 

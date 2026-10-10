@@ -59,6 +59,141 @@ export class DashboardView {
     }
   }
 
+  bindCreateWorkspace({ onSubmit, onCancel }) {
+    const form = document.getElementById('form-create-workspace');
+    const nameInput = document.getElementById('create-workspace-name');
+    const metaIdInput = document.getElementById('create-workspace-meta-id');
+    const metaSecretInput = document.getElementById('create-workspace-meta-secret');
+    const serviceTypeSelect = document.getElementById('create-workspace-service-type');
+    const currencySelect = document.getElementById('create-workspace-currency');
+    const submitBtn = document.getElementById('create-workspace-submit-btn');
+    const toggleSecretBtn = document.getElementById('toggle-secret-visibility-btn');
+    const cancelBtn = document.getElementById('back-to-workspaces-btn');
+
+    if (!form || !submitBtn) return;
+
+    // Real-time validation
+    const checkFormValidity = () => {
+      const name = nameInput.value.trim();
+      const metaAppId = metaIdInput.value.trim();
+      const metaAppSecret = metaSecretInput.value.trim();
+      const serviceType = serviceTypeSelect.value;
+      const currencyCode = currencySelect.value;
+      const isValid = Boolean(name && metaAppId && metaAppSecret && serviceType && currencyCode);
+
+      if (isValid && !submitBtn.dataset.loading) {
+        submitBtn.disabled = false;
+        submitBtn.className = "w-full sm:w-auto px-7 py-3 rounded-xl font-semibold bg-white hover:bg-zinc-200 text-black text-xs sm:text-sm transition transform hover:scale-[1.02] shadow-lg flex items-center justify-center gap-2 cursor-pointer";
+      } else {
+        submitBtn.disabled = true;
+        submitBtn.className = "w-full sm:w-auto px-7 py-3 rounded-xl font-semibold bg-zinc-800 text-zinc-500 opacity-40 cursor-not-allowed border border-zinc-700 text-xs sm:text-sm transition flex items-center justify-center gap-2";
+      }
+    };
+
+    [nameInput, metaIdInput, metaSecretInput].forEach(el => el.addEventListener('input', checkFormValidity));
+    [serviceTypeSelect, currencySelect].forEach(el => el.addEventListener('change', checkFormValidity));
+
+    // Secret visibility toggle
+    if (toggleSecretBtn) {
+      toggleSecretBtn.addEventListener('click', () => {
+        const type = metaSecretInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        metaSecretInput.setAttribute('type', type);
+        toggleSecretBtn.innerHTML = type === 'password' 
+          ? '<i class="fa-regular fa-eye text-xs"></i>' 
+          : '<i class="fa-regular fa-eye-slash text-xs"></i>';
+      });
+    }
+
+    // Submit handler
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (submitBtn.disabled) return;
+      
+      const payload = {
+        name: nameInput.value.trim(),
+        metaAppId: metaIdInput.value.trim(),
+        metaAppSecret: metaSecretInput.value.trim(),
+        serviceType: serviceTypeSelect.value,
+        currencyCode: currencySelect.value
+      };
+      
+      if (onSubmit) onSubmit(payload);
+    });
+
+    if (cancelBtn && onCancel) {
+      cancelBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        onCancel();
+      });
+    }
+  }
+
+  setCreateWorkspaceLoading(isLoading) {
+    const submitBtn = document.getElementById('create-workspace-submit-btn');
+    if (!submitBtn) return;
+
+    if (isLoading) {
+      submitBtn.dataset.loading = "true";
+      submitBtn.disabled = true;
+      submitBtn.className = "w-full sm:w-auto px-7 py-3 rounded-xl font-semibold bg-zinc-800 text-white opacity-80 cursor-wait border border-zinc-700 text-xs sm:text-sm transition flex items-center justify-center gap-2";
+      submitBtn.innerHTML = `
+        <svg class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>Creating Workspace...</span>
+      `;
+    } else {
+      delete submitBtn.dataset.loading;
+      submitBtn.innerHTML = `
+        <i class="fa-solid fa-plus text-xs"></i>
+        <span>Create Workspace</span>
+      `;
+      // Dispatch input event to re-evaluate validity
+      const nameInput = document.getElementById('create-workspace-name');
+      if (nameInput) nameInput.dispatchEvent(new Event('input'));
+    }
+  }
+
+  showCreateWorkspaceFeedback({ type, message }) {
+    const fb = document.getElementById('create-workspace-feedback');
+    if (!fb) return;
+
+    fb.classList.remove('hidden');
+    if (type === 'success') {
+      fb.className = "mb-6 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3";
+      fb.innerHTML = `
+        <i class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span class="text-xs font-semibold text-emerald-300">${this._escape(message)}</span>
+      `;
+    } else {
+      fb.className = "mb-6 px-4 py-3 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center gap-3";
+      fb.innerHTML = `
+        <i class="fa-solid fa-circle-exclamation text-rose-400"></i>
+        <span class="text-xs font-semibold text-rose-300">${this._escape(message)}</span>
+      `;
+    }
+  }
+
+  resetCreateWorkspaceForm() {
+    const form = document.getElementById('form-create-workspace');
+    if (form) form.reset();
+    
+    const fb = document.getElementById('create-workspace-feedback');
+    if (fb) fb.classList.add('hidden');
+
+    const submitBtn = document.getElementById('create-workspace-submit-btn');
+    if (submitBtn) {
+      delete submitBtn.dataset.loading;
+      submitBtn.disabled = true;
+      submitBtn.className = "w-full sm:w-auto px-7 py-3 rounded-xl font-semibold bg-zinc-800 text-zinc-500 opacity-40 cursor-not-allowed border border-zinc-700 text-xs sm:text-sm transition flex items-center justify-center gap-2";
+      submitBtn.innerHTML = `
+        <i class="fa-solid fa-plus text-xs"></i>
+        <span>Create Workspace</span>
+      `;
+    }
+  }
+
   _bindWorkspacesDropdownEvents() {
     if (this.workspacesBtn && this.workspacesMenu) {
       this.workspacesBtn.addEventListener('click', (e) => {

@@ -24,6 +24,12 @@ export class DashboardController {
       onSave: this.handleSaveRole.bind(this)
     });
 
+    // 3a. Delegate Create Workspace form
+    this.view.bindCreateWorkspace({
+      onSubmit: this.handleCreateWorkspace.bind(this),
+      onCancel: () => this.handleNavigation('workspaces')
+    });
+
     // 3b. Header breadcrumb navigation handler
     this.view.onBreadcrumbNavigate = (target, workspaceId) => {
       if (target === 'workspaces') {
@@ -79,6 +85,28 @@ export class DashboardController {
           }
         }
       });
+    }
+  }
+
+  async handleCreateWorkspace(payload) {
+    this.view.setCreateWorkspaceLoading(true);
+    try {
+      await this.model.createWorkspace(payload);
+      this.view.showCreateWorkspaceFeedback({ type: 'success', message: 'Workspace created successfully!' });
+      
+      // Reload workspaces data to reflect the new workspace
+      await this.loadProfilesMetric();
+      
+      // Transition back to workspaces tab after brief delay
+      setTimeout(() => {
+        this.view.resetCreateWorkspaceForm();
+        this.handleNavigation('workspaces');
+      }, 1500);
+    } catch (err) {
+      console.error("DashboardController: Error creating workspace:", err);
+      const serverMessage = err.serverMessage || err.message || "Failed to create workspace";
+      this.view.showCreateWorkspaceFeedback({ type: 'error', message: serverMessage });
+      this.view.setCreateWorkspaceLoading(false);
     }
   }
 
@@ -295,28 +323,32 @@ export class DashboardController {
       console.error("DashboardController: Error loading DM to checkout rate:", err);
       const serverMessage = err.serverMessage || err.message || "Server did not respond";
       this.view.renderDmToCheckoutError(serverMessage);
-    }
-  }
+    async handleNavigation(target) {
+      if (target === 'users') {
+        this.view.showSection('users');
+        this.view.renderUsersLoading();
 
-  async handleNavigation(target) {
-    if (target === 'users') {
-      this.view.showSection('users');
-      this.view.renderUsersLoading();
-
-      try {
-        const users = await this.model.fetchUsers();
-        this.view.renderUsersTable(users);
-      } catch (err) {
-        console.error("DashboardController: Error fetching users:", err);
-        const serverMessage = err.serverMessage || err.message || "Failed to communicate with server.";
-        const status = err.status || (String(serverMessage).toLowerCase().includes('unauthorized') ? 401 : 403);
-        this.view.renderUsersError({
-          status: status,
-          message: serverMessage
-        }, () => this.handleNavigation('users'));
+        try {
+          const users = await this.model.fetchUsers();
+          this.view.renderUsersTable(users);
+        } catch (err) {
+          console.error("DashboardController: Error fetching users:", err);
+          const serverMessage = err.serverMessage || err.message || "Failed to communicate with server.";
+          const status = err.status || (String(serverMessage).toLowerCase().includes('unauthorized') ? 401 : 403);
+          this.view.renderUsersError({
+            status: status,
+            message: serverMessage
+          }, () => this.handleNavigation('users'));
+        }
+      } else if (target === 'workspaces') {
+        this.view.showSection('workspaces');
+      } else if (target === 'create-workspace') {
+        this.view.showSection('create-workspace');
+      } else {
+        // Default to overview section
+        this.view.showSection('overview');
       }
-    } else if (target === 'workspaces' || target === 'chatbots') {
-      this.view.showSection('workspaces');
+    }
       this.view.renderWorkspacesCardsLoading();
 
       try {

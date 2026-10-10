@@ -365,6 +365,13 @@ export class DashboardModel {
     return result;
   }
 
+  async createWorkspace(workspaceData) {
+    const newWorkspace = await this.apiService.createWorkspace(workspaceData);
+    // Invalidate cached workspaces so fresh data is fetched on next load
+    this.cachedUserWorkspaces = null;
+    return newWorkspace;
+  }
+
   async fetchUserProfiles(clerkId) {
     return this.fetchUserWorkspaces(clerkId);
   }

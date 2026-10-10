@@ -2541,6 +2541,143 @@ export class DashboardView {
     }
   }
 
+  showDeleteChannelModal({ workspace, channel, onConfirm }) {
+    if (!this.modalContainer) {
+      this.modalContainer = document.getElementById('modal-container');
+    }
+    if (!this.modalContainer) return;
+
+    const chPlatform = channel.platform || channel.channel || 'webchat';
+    const wsName = workspace?.name || `Workspace #${workspace?.id || ''}`;
+    const pageId = channel.metaPageId || channel.id || 'N/A';
+
+    this.modalContainer.innerHTML = `
+      <div id="delete-channel-modal-backdrop" class="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div class="bento-card w-full max-w-md rounded-3xl p-6 sm:p-8 relative overflow-hidden border border-rose-500/20 shadow-2xl animate-in zoom-in-95 duration-200">
+          
+          <!-- Ambient Glow Accent -->
+          <div class="absolute -top-20 -right-20 w-44 h-44 bg-rose-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <!-- Danger Header Icon -->
+          <div class="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-4 shadow-inner">
+            <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+          </div>
+
+          <!-- Title & Prompt -->
+          <h3 class="text-lg sm:text-xl font-bold text-white tracking-tight mb-2">
+            Delete Channel?
+          </h3>
+          <p class="text-xs sm:text-sm text-zinc-400 mb-5 leading-relaxed">
+            Are you sure you want to delete this channel? Active conversation webhooks will be disconnected.
+          </p>
+
+          <!-- Channel & Workspace Metadata Callout Card -->
+          <div class="bg-[#0d0d10] border border-zinc-800 rounded-2xl p-4 space-y-2.5 mb-6 text-xs">
+            <div class="flex items-center justify-between pb-2 border-b border-zinc-800/80">
+              <span class="text-zinc-500 font-medium">Channel</span>
+              <span class="text-white font-semibold flex items-center gap-1.5 capitalize">
+                ${this._getChannelIcon(chPlatform)}
+                <span>${this._escape(chPlatform)}</span>
+              </span>
+            </div>
+            <div class="flex items-center justify-between pb-2 border-b border-zinc-800/80">
+              <span class="text-zinc-500 font-medium">Workspace</span>
+              <span class="text-white font-semibold flex items-center gap-1.5">
+                <i class="fa-solid fa-briefcase text-xs text-zinc-400"></i>
+                <span class="truncate max-w-[200px]">${this._escape(wsName)}</span>
+              </span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-zinc-500 font-medium">Meta Page ID</span>
+              <span class="font-mono text-zinc-300 font-semibold flex items-center gap-1">
+                <i class="fa-solid fa-hashtag text-[11px] text-zinc-500"></i>
+                <span>${this._escape(pageId)}</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Error Feedback Container -->
+          <div id="modal-delete-channel-error" class="hidden mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-400 font-medium"></div>
+
+          <!-- Actions: Cancel and Yes -->
+          <div class="flex items-center justify-end gap-3 pt-2">
+            <button 
+              type="button" 
+              id="modal-cancel-delete-channel-btn" 
+              class="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button 
+              type="button" 
+              id="modal-confirm-delete-channel-btn" 
+              class="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-rose-600 hover:bg-rose-500 text-white transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-rose-950/40"
+            >
+              <i class="fa-solid fa-trash-can text-xs"></i>
+              <span>Yes</span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+    `;
+
+    const backdrop = document.getElementById('delete-channel-modal-backdrop');
+    const cancelBtn = document.getElementById('modal-cancel-delete-channel-btn');
+    const confirmBtn = document.getElementById('modal-confirm-delete-channel-btn');
+    const errorBox = document.getElementById('modal-delete-channel-error');
+
+    const closeModal = () => {
+      if (this.modalContainer) this.modalContainer.innerHTML = '';
+      document.removeEventListener('keydown', handleKey);
+    };
+
+    const handleKey = (e) => {
+      if (e.key === 'Escape') closeModal();
+    };
+
+    document.addEventListener('keydown', handleKey);
+
+    if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+
+    if (backdrop) {
+      backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop) closeModal();
+      });
+    }
+
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', async () => {
+        confirmBtn.disabled = true;
+        if (cancelBtn) cancelBtn.disabled = true;
+        confirmBtn.innerHTML = `
+          <svg class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>Deleting...</span>
+        `;
+        if (errorBox) errorBox.classList.add('hidden');
+
+        try {
+          if (onConfirm) {
+            await onConfirm(channel.id);
+          }
+          closeModal();
+        } catch (err) {
+          console.error("Modal delete channel error:", err);
+          confirmBtn.disabled = false;
+          if (cancelBtn) cancelBtn.disabled = false;
+          confirmBtn.innerHTML = `<i class="fa-solid fa-trash-can text-xs"></i> <span>Yes</span>`;
+          if (errorBox) {
+            errorBox.textContent = err.serverMessage || err.message || "Failed to delete channel";
+            errorBox.classList.remove('hidden');
+          }
+        }
+      });
+    }
+  }
+
   renderChannelConfigView(workspace, channel, { onBackToWorkspaces, onBackToWorkspaceDetail, onToggleStatus, onSaveChannel, onDeleteChannel }) {
     if (!this.workspaceDetailContent) return;
 
@@ -2701,31 +2838,14 @@ export class DashboardView {
 
     const deleteBtn = document.getElementById('delete-channel-config-btn');
     if (deleteBtn && onDeleteChannel) {
-      deleteBtn.addEventListener('click', async () => {
-        const confirmDelete = window.confirm(`Are you sure you want to delete this ${chPlatform} channel? This action cannot be undone.`);
-        if (!confirmDelete) return;
-
-        deleteBtn.disabled = true;
-        deleteBtn.innerHTML = `
-          <svg class="animate-spin h-3.5 w-3.5 text-rose-400" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <span>Deleting...</span>
-        `;
-        if (errorBox) errorBox.classList.add('hidden');
-
-        try {
-          await onDeleteChannel(channel.id);
-        } catch (err) {
-          console.error("Failed to delete channel:", err);
-          deleteBtn.disabled = false;
-          deleteBtn.innerHTML = `<i class="fa-solid fa-trash-can text-xs"></i> <span>Delete Channel</span>`;
-          if (errorBox) {
-            errorBox.textContent = err.serverMessage || err.message || "Failed to delete channel";
-            errorBox.classList.remove('hidden');
+      deleteBtn.addEventListener('click', () => {
+        this.showDeleteChannelModal({
+          workspace,
+          channel,
+          onConfirm: async (channelId) => {
+            await onDeleteChannel(channelId);
           }
-        }
+        });
       });
     }
 

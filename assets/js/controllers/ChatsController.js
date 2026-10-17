@@ -79,12 +79,8 @@ export class ChatsController {
         this.view.renderNoActiveChat();
       } else {
         const firstChat = filtered[0];
-        this.model.selectedChatId = firstChat.id;
         this.view.renderThreadCards(filtered, firstChat.id);
-        this.view.renderActiveChat(firstChat);
-
-        // Fetch full message history for first chat if available
-        this._fetchAndRenderHistory(firstChat.id);
+        await this.selectChat(firstChat.id);
       }
     } catch (err) {
       console.error("ChatsController: Error fetching initial chats:", err);
@@ -131,10 +127,8 @@ export class ChatsController {
         this.view.renderNoActiveChat();
       } else {
         const firstChat = filtered[0];
-        this.model.selectedChatId = firstChat.id;
         this.view.renderThreadCards(filtered, firstChat.id);
-        this.view.renderActiveChat(firstChat);
-        this._fetchAndRenderHistory(firstChat.id);
+        await this.selectChat(firstChat.id);
       }
     } catch (err) {
       console.error("ChatsController: Error changing workspace filter:", err);
@@ -175,10 +169,8 @@ export class ChatsController {
         this.view.renderNoActiveChat();
       } else {
         const firstChat = filtered[0];
-        this.model.selectedChatId = firstChat.id;
         this.view.renderThreadCards(filtered, firstChat.id);
-        this.view.renderActiveChat(firstChat);
-        this._fetchAndRenderHistory(firstChat.id);
+        await this.selectChat(firstChat.id);
       }
     } catch (err) {
       console.error("ChatsController: Error changing channel filter:", err);
@@ -229,17 +221,41 @@ export class ChatsController {
     }
   }
 
-  async _fetchAndRenderHistory(chatId) {
-    const chat = this.model.getChatById(chatId);
-    if (!chat) return;
+  /**
+   * Selects a chat thread, triggers GET /chats/:id to load full chat data and messages,
+   * and renders the messages with agent blue background and explicit sender labels.
+   */
+  async selectChat(chatId) {
+    this.model.selectedChatId = chatId;
+    this.view.setActiveCard(chatId);
 
+    // 1. Immediately render cached chat metadata in Pane 2 & 3 while fetching
+    let chat = this.model.getChatById(chatId);
+    if (chat) {
+      this.view.renderActiveChat(chat);
+      this.view.setChatStreamLoading();
+    }
+
+    // 2. Fetch full chat data and messages from GET /chats/:id
     try {
-      const messages = await this.model.apiService.fetchChatMessages(chatId);
-      if (Array.isArray(messages) && messages.length > 0) {
-        this.view.renderChatMessages(chat, messages);
+      const fullChatData = await this.model.fetchChatDetails(chatId);
+      if (fullChatData) {
+        chat = {
+          ...(chat || {}),
+          ...fullChatData,
+          messages: fullChatData.messages || [],
+          cart: fullChatData.cart || (chat?.cart),
+          userName: fullChatData.userName || chat?.userName || chat?.user_name,
+          user_name: fullChatData.userName || chat?.userName || chat?.user_name
+        };
+        // Re-render complete chat timeline and context sidebar
+        this.view.renderActiveChat(chat, chat.messages);
       }
-    } catch (e) {
-      // Gracefully keeps default snippet view if full history endpoint is not available
+    } catch (err) {
+      console.error(`ChatsController: Error fetching chat details for #${chatId}:`, err);
+      if (chat) {
+        this.view.renderActiveChat(chat);
+      }
     }
   }
 
@@ -259,15 +275,9 @@ export class ChatsController {
       this.handleSearch(query);
     });
 
-    // 4. Thread card selection delegation
+    // 4. Thread card selection delegation (clicking a chat calls GET /chats/:id)
     this.view.bindThreadCardSelect(async (chatId) => {
-      this.model.selectedChatId = chatId;
-      const chat = this.model.getChatById(chatId);
-      if (chat) {
-        this.view.setActiveCard(chatId);
-        this.view.renderActiveChat(chat);
-        await this._fetchAndRenderHistory(chatId);
-      }
+      await this.selectChat(chatId);
     });
 
     // 5. Infinite Scroll Pagination (IntersectionObserver + Scroll fallback)

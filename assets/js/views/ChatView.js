@@ -190,10 +190,63 @@ export class ChatView {
     }
   }
 
+  setChatStreamLoading() {
+    const stream = document.getElementById('active-chat-stream');
+    if (stream) {
+      stream.innerHTML = `
+        <div class="py-16 flex flex-col items-center justify-center text-center text-zinc-500 gap-3">
+          <svg class="animate-spin h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span class="text-xs font-mono text-zinc-400">Loading conversation history...</span>
+        </div>
+      `;
+    }
+  }
+
+  _buildMessageBubbleHtml(msg, chat) {
+    const sender = String(msg.sender || '').toLowerCase().trim();
+    const isAgent = sender === 'agent' || sender === 'bot' || sender === 'ai';
+    const msgText = this._escape(msg.text || msg.content || msg.body || '');
+    const msgTime = this.formatRelativeTime(msg.createdAt || msg.timestamp);
+    const customerName = this._escape(chat.userName || chat.user_name || chat.title || 'Customer');
+
+    if (isAgent) {
+      // Outgoing message for agent: displayed in blue background like Instagram DM with explicit sender tag
+      return `
+        <div class="flex flex-col items-end max-w-lg ml-auto space-y-1">
+          <div class="flex items-center gap-1.5 text-[10px] text-blue-400 font-semibold px-1">
+            <i class="fa-solid fa-robot text-[9px]"></i>
+            <span>Agent (AI Moderator)</span>
+            ${msgTime ? `<span class="text-zinc-500 font-normal font-mono">• ${msgTime}</span>` : ''}
+          </div>
+          <div class="bg-[#0084ff] text-white p-3.5 rounded-2xl rounded-tr-sm text-xs shadow-md leading-relaxed break-words font-normal">
+            ${msgText}
+          </div>
+        </div>
+      `;
+    }
+
+    // Incoming message for user/customer: left-aligned with explicit sender tag
+    return `
+      <div class="flex flex-col items-start max-w-lg mr-auto space-y-1">
+        <div class="flex items-center gap-1.5 text-[10px] text-zinc-300 font-semibold px-1">
+          <i class="fa-regular fa-user text-[9px] text-zinc-400"></i>
+          <span>${customerName}</span>
+          ${msgTime ? `<span class="text-zinc-500 font-normal font-mono">• ${msgTime}</span>` : ''}
+        </div>
+        <div class="bg-zinc-800 text-zinc-100 p-3.5 rounded-2xl rounded-tl-sm text-xs border border-zinc-700/60 leading-relaxed break-words shadow-sm">
+          ${msgText}
+        </div>
+      </div>
+    `;
+  }
+
   renderActiveChat(chat, messages = null) {
     if (!this.activeChatContainer) return;
 
-    const heading = this._escape(chat.user_name || chat.title || 'Customer');
+    const heading = this._escape(chat.userName || chat.user_name || chat.title || 'Customer');
     const platform = this._escape(chat.platform || 'webchat');
     const workspaceName = this._escape(chat.workspaceName || 'Workspace');
     const channelId = this._escape(chat.channelId || 'ch_default');
@@ -220,59 +273,31 @@ export class ChatView {
     const pillClass = platformColors[platform.toLowerCase()] || 'bg-zinc-800 text-zinc-300 border-zinc-700';
 
     // Build timeline messages HTML
+    const msgList = Array.isArray(messages) ? messages : (Array.isArray(chat.messages) ? chat.messages : []);
     let messagesHtml = '';
-    if (Array.isArray(messages) && messages.length > 0) {
-      messagesHtml = messages.map(msg => {
-        const isBot = msg.sender === 'agent' || msg.sender === 'bot' || msg.isBot;
-        const msgText = this._escape(msg.content || msg.text || msg.body || '');
-        const msgTime = this.formatRelativeTime(msg.timestamp || msg.createdAt);
-        const senderLabel = isBot ? 'Xynex AI' : heading;
 
-        if (isBot) {
-          return `
-            <div class="flex flex-col items-end max-w-md ml-auto">
-              <span class="text-[10px] text-zinc-500 mb-1">${senderLabel} • ${msgTime}</span>
-              <div class="bg-white text-black font-medium p-3 rounded-2xl rounded-tr-sm text-xs shadow-sm leading-relaxed">
-                ${msgText}
-              </div>
-            </div>
-          `;
-        }
-
-        return `
-          <div class="flex flex-col items-start max-w-md">
-            <span class="text-[10px] text-zinc-500 mb-1">${senderLabel} • ${msgTime}</span>
-            <div class="bg-zinc-800 text-white p-3 rounded-2xl rounded-tl-sm text-xs border border-zinc-700/60 leading-relaxed">
-              ${msgText}
-            </div>
-          </div>
-        `;
-      }).join('');
+    if (msgList.length > 0) {
+      messagesHtml = msgList.map(msg => this._buildMessageBubbleHtml(msg, chat)).join('');
     } else {
       // Default initial message stream view
       messagesHtml = `
-        <!-- Customer Msg -->
-        <div class="flex flex-col items-start max-w-md">
-          <span class="text-[10px] text-zinc-500 mb-1">${heading} • ${relativeTime}</span>
-          <div class="bg-zinc-800 text-white p-3 rounded-2xl rounded-tl-sm text-xs border border-zinc-700/60 leading-relaxed">
+        <div class="flex flex-col items-start max-w-lg mr-auto space-y-1">
+          <div class="flex items-center gap-1.5 text-[10px] text-zinc-300 font-semibold px-1">
+            <i class="fa-regular fa-user text-[9px] text-zinc-400"></i>
+            <span>${heading}</span>
+            ${relativeTime ? `<span class="text-zinc-500 font-normal font-mono">• ${relativeTime}</span>` : ''}
+          </div>
+          <div class="bg-zinc-800 text-zinc-100 p-3.5 rounded-2xl rounded-tl-sm text-xs border border-zinc-700/60 leading-relaxed break-words shadow-sm">
             ${snippet}
           </div>
         </div>
 
         <!-- System Execution Tag -->
-        <div class="flex justify-center">
+        <div class="flex justify-center my-3">
           <div class="bg-[#0d0d10] border border-zinc-800 rounded-lg px-3 py-1.5 text-[10px] font-mono text-zinc-400 flex items-center gap-2 shadow-sm">
             <i class="fa-solid fa-bolt text-amber-400"></i>
-            <span>Vision Engine Synced: <strong class="text-white">Active Product Match</strong></span>
+            <span>Conversation Connected: <strong class="text-white">${heading}</strong></span>
             <span class="text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">LIVE</span>
-          </div>
-        </div>
-
-        <!-- AI Bot Msg -->
-        <div class="flex flex-col items-end max-w-md ml-auto">
-          <span class="text-[10px] text-zinc-500 mb-1">Xynex AI • ${relativeTime}</span>
-          <div class="bg-white text-black font-medium p-3 rounded-2xl rounded-tr-sm text-xs shadow-sm leading-relaxed">
-            I am actively assisting this customer on ${platform}. Real-time catalog checkout links are dispatched directly.
           </div>
         </div>
       `;
@@ -305,7 +330,7 @@ export class ChatView {
       </div>
 
       <!-- Chat Stream -->
-      <div id="active-chat-stream" class="flex-1 overflow-y-auto p-6 space-y-5">
+      <div id="active-chat-stream" class="flex-1 overflow-y-auto p-6 space-y-4">
         ${messagesHtml}
       </div>
 
@@ -320,20 +345,42 @@ export class ChatView {
 
     // PANE 3: Context & Metadata
     if (this.activeChatContext) {
-      const cartNum = chat.cartId || (chat.cart && chat.cart.id) || 502;
+      const cartObj = chat.cart;
+      const cartId = cartObj?.id || chat.cartId || 557;
+      const currency = cartObj?.currencyCode || 'USD';
+      const totalPrice = cartObj?.totalPrice !== undefined ? Number(cartObj.totalPrice).toFixed(2) : '0.00';
+      const itemsCount = Array.isArray(cartObj?.items) ? cartObj.items.length : 0;
+
+      let pendingHtml = '';
+      if (chat.pendingSelections && chat.pendingSelections.productId) {
+        pendingHtml = `
+          <div class="border-t border-zinc-800/80 pt-2.5 mt-2.5 text-xs space-y-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
+              <i class="fa-solid fa-cart-arrow-down text-[9px]"></i> Pending Selection
+            </span>
+            <div class="text-zinc-300 font-mono text-[11px]">Product SKU #${this._escape(chat.pendingSelections.productId)}</div>
+          </div>
+        `;
+      }
+
       this.activeChatContext.innerHTML = `
         <!-- Active Order State -->
         <div>
           <h3 class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-3">Active Order State</h3>
           <div class="bg-[#111114] border border-zinc-800 rounded-2xl p-4 space-y-3 shadow-sm">
             <div class="flex justify-between items-center">
-              <span class="text-xs font-bold text-white">Cart #${this._escape(cartNum)}</span>
-              <span class="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">CONFIRMED</span>
+              <span class="text-xs font-bold text-white">Cart #${this._escape(cartId)}</span>
+              <span class="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">ACTIVE</span>
             </div>
             <div class="border-t border-zinc-800/80 pt-2 flex justify-between text-xs">
               <span class="text-zinc-400">Total Price</span>
-              <span class="font-mono text-white font-bold">$280.00</span>
+              <span class="font-mono text-white font-bold">${this._escape(currency)} ${this._escape(totalPrice)}</span>
             </div>
+            <div class="flex justify-between text-[11px] text-zinc-500">
+              <span>Items in cart</span>
+              <span>${itemsCount} item(s)</span>
+            </div>
+            ${pendingHtml}
           </div>
         </div>
 
@@ -353,6 +400,10 @@ export class ChatView {
               <span class="text-white font-mono">#${channelId}</span>
             </div>
             <div class="flex justify-between">
+              <span class="text-zinc-400">Sender ID</span>
+              <span class="text-zinc-400 font-mono truncate max-w-[120px]" title="${this._escape(chat.senderId || '')}">${this._escape(chat.senderId || 'N/A')}</span>
+            </div>
+            <div class="flex justify-between">
               <span class="text-zinc-400">Latency</span>
               <span class="text-emerald-400 font-mono font-semibold">0.78s</span>
             </div>
@@ -368,37 +419,19 @@ export class ChatView {
 
   renderChatMessages(chat, messages) {
     const stream = document.getElementById('active-chat-stream');
-    if (!stream || !Array.isArray(messages) || messages.length === 0) return;
+    if (!stream) return;
 
-    const heading = this._escape(chat.user_name || chat.title || 'Customer');
-
-    stream.innerHTML = messages.map(msg => {
-      const isBot = msg.sender === 'agent' || msg.sender === 'bot' || msg.isBot;
-      const msgText = this._escape(msg.content || msg.text || msg.body || '');
-      const msgTime = this.formatRelativeTime(msg.timestamp || msg.createdAt);
-      const senderLabel = isBot ? 'Xynex AI' : heading;
-
-      if (isBot) {
-        return `
-          <div class="flex flex-col items-end max-w-md ml-auto">
-            <span class="text-[10px] text-zinc-500 mb-1">${senderLabel} • ${msgTime}</span>
-            <div class="bg-white text-black font-medium p-3 rounded-2xl rounded-tr-sm text-xs shadow-sm leading-relaxed">
-              ${msgText}
-            </div>
-          </div>
-        `;
-      }
-
-      return `
-        <div class="flex flex-col items-start max-w-md">
-          <span class="text-[10px] text-zinc-500 mb-1">${senderLabel} • ${msgTime}</span>
-          <div class="bg-zinc-800 text-white p-3 rounded-2xl rounded-tl-sm text-xs border border-zinc-700/60 leading-relaxed">
-            ${msgText}
-          </div>
+    const list = Array.isArray(messages) ? messages : [];
+    if (list.length === 0) {
+      stream.innerHTML = `
+        <div class="py-12 text-center text-zinc-500 text-xs">
+          No messages found in this conversation.
         </div>
       `;
-    }).join('');
+      return;
+    }
 
+    stream.innerHTML = list.map(msg => this._buildMessageBubbleHtml(msg, chat)).join('');
     stream.scrollTop = stream.scrollHeight;
   }
 

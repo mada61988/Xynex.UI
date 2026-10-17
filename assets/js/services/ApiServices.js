@@ -89,6 +89,37 @@ export class ApiService {
     return await response.json();
   }
 
+  async fetchChatDetails(chatId) {
+    if (!chatId) {
+      throw new Error("chatId is required to fetch chat details");
+    }
+    const headers = await this.getHeaders();
+    const response = await fetch(`${CONFIG.API_BASE_URL}/chats/${encodeURIComponent(chatId)}`, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      let serverMessage = response.statusText;
+      try {
+        const errorData = await response.json();
+        serverMessage = errorData.message || errorData.error || errorData.detail || JSON.stringify(errorData);
+      } catch (e) {
+        try {
+          const text = await response.text();
+          if (text) serverMessage = text;
+        } catch (_) {}
+      }
+
+      const err = new Error(serverMessage || `Request failed with status ${response.status}`);
+      err.status = response.status;
+      err.serverMessage = serverMessage;
+      throw err;
+    }
+
+    return await response.json();
+  }
+
   async fetchChatMessages(chatId) {
     if (!chatId) return null;
     try {

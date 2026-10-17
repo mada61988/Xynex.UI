@@ -316,6 +316,13 @@ export class DashboardModel {
   }
 
   /**
+   * Fetches full chat details and messages for a specific chat from GET /chats/:id.
+   */
+  async fetchChatDetails(chatId) {
+    return await this.apiService.fetchChatDetails(chatId);
+  }
+
+  /**
    * Fetches full messages history for a specific chat.
    */
   async fetchChatMessages(chatId) {

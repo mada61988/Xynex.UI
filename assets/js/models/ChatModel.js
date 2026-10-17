@@ -194,6 +194,33 @@ export class ChatModel {
     return this.chats.find(c => String(c.id) === String(id)) || null;
   }
 
+  /**
+   * Fetches full chat details and messages from GET /chats/:id and updates local cache.
+   */
+  async fetchChatDetails(chatId) {
+    if (!chatId) return null;
+    const details = await this.apiService.fetchChatDetails(chatId);
+    if (details && details.id) {
+      const idx = this.chats.findIndex(c => String(c.id) === String(chatId));
+      const userName = details.userName || details.user_name || (idx !== -1 ? this.chats[idx].user_name : 'Customer');
+      const normalizedDetails = {
+        ...(idx !== -1 ? this.chats[idx] : {}),
+        ...details,
+        user_name: userName,
+        title: userName,
+        messages: Array.isArray(details.messages) ? details.messages : [],
+        cart: details.cart || (idx !== -1 ? this.chats[idx].cart : null),
+        cartId: details.cart ? details.cart.id : (idx !== -1 ? this.chats[idx].cartId : null)
+      };
+
+      if (idx !== -1) {
+        this.chats[idx] = normalizedDetails;
+      }
+      return normalizedDetails;
+    }
+    return details;
+  }
+
   getSelectedChat() {
     if (this.selectedChatId) {
       const found = this.getChatById(this.selectedChatId);

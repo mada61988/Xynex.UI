@@ -221,6 +221,20 @@ export class ChatModel {
     return details;
   }
 
+  /**
+   * Fetches orders for a specific sender ID from GET /orders/sender/:senderId
+   */
+  async fetchOrdersBySender(senderId) {
+    if (!senderId) return [];
+    try {
+      const orders = await this.apiService.fetchOrdersBySender(senderId);
+      return Array.isArray(orders) ? orders : [];
+    } catch (err) {
+      console.warn(`ChatModel: Failed to fetch orders for sender ${senderId}:`, err);
+      return [];
+    }
+  }
+
   getSelectedChat() {
     if (this.selectedChatId) {
       const found = this.getChatById(this.selectedChatId);

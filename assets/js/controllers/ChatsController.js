@@ -9,6 +9,7 @@ export class ChatsController {
     this.view = new ChatView();
     this.isInitialized = false;
     this.workspacesCache = [];
+    this.currentChatOrders = [];
     this.observer = null;
   }
 
@@ -250,6 +251,23 @@ export class ChatsController {
         };
         // Re-render complete chat timeline and context sidebar
         this.view.renderActiveChat(chat, chat.messages);
+
+        // 3. Fetch customer orders using GET /orders/sender/:senderId
+        const senderId = chat.senderId || (typeof chat.sender_id === 'object' ? chat.sender_id.id : chat.sender_id);
+        if (senderId) {
+          try {
+            const orders = await this.model.fetchOrdersBySender(senderId);
+            this.currentChatOrders = Array.isArray(orders) ? orders : [];
+            this.view.renderUserOrders(this.currentChatOrders);
+          } catch (orderErr) {
+            console.warn(`ChatsController: Could not load orders for sender ${senderId}:`, orderErr);
+            this.currentChatOrders = [];
+            this.view.renderUserOrders([]);
+          }
+        } else {
+          this.currentChatOrders = [];
+          this.view.renderUserOrders([]);
+        }
       }
     } catch (err) {
       console.error(`ChatsController: Error fetching chat details for #${chatId}:`, err);
@@ -280,7 +298,15 @@ export class ChatsController {
       await this.selectChat(chatId);
     });
 
-    // 5. Infinite Scroll Pagination (IntersectionObserver + Scroll fallback)
+    // 5. User order card click delegation to open details modal
+    this.view.bindUserOrderClick((orderId) => {
+      const order = this.currentChatOrders.find(o => String(o.id) === String(orderId));
+      if (order) {
+        this.view.renderOrderDetailsModal(order);
+      }
+    });
+
+    // 6. Infinite Scroll Pagination (IntersectionObserver + Scroll fallback)
     this.setupInfiniteScroll();
   }
 

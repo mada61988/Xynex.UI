@@ -384,6 +384,23 @@ export class ChatView {
           </div>
         </div>
 
+        <!-- Orders Display (User Orders) -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Customer Orders</h3>
+            <span id="user-orders-count-badge" class="text-[10px] font-mono text-zinc-500 bg-zinc-800/80 border border-zinc-700/60 px-2 py-0.5 rounded-full">Syncing...</span>
+          </div>
+          <div id="user-orders-list-container" class="bg-[#111114] border border-zinc-800 rounded-2xl p-3 space-y-2 max-h-56 overflow-y-auto shadow-sm">
+            <div class="py-4 flex flex-col items-center justify-center text-zinc-500 text-xs gap-2">
+              <svg class="animate-spin h-4 w-4 text-blue-400" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span class="text-[11px] font-mono text-zinc-500">Fetching customer orders...</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Channel Telemetry -->
         <div>
           <h3 class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-3">Channel Telemetry</h3>
@@ -535,4 +552,248 @@ export class ChatView {
       });
     }
   }
+
+  renderUserOrders(orders) {
+    const container = document.getElementById('user-orders-list-container');
+    const badge = document.getElementById('user-orders-count-badge');
+    const list = Array.isArray(orders) ? orders : [];
+
+    if (badge) {
+      badge.textContent = `${list.length} order${list.length === 1 ? '' : 's'}`;
+    }
+
+    if (!container) return;
+
+    if (list.length === 0) {
+      container.innerHTML = `
+        <div class="py-4 text-center text-zinc-500 text-xs flex flex-col items-center justify-center gap-1.5">
+          <i class="fa-solid fa-box-open text-zinc-600 text-lg"></i>
+          <span>No previous orders found</span>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = list.map(order => {
+      const status = String(order.status || 'CONFIRMED').toUpperCase();
+      let statusBadge = 'bg-zinc-800 text-zinc-400 border-zinc-700';
+      if (status === 'CONFIRMED') statusBadge = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+      else if (status === 'PENDING') statusBadge = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+      else if (status === 'CANCELLED' || status === 'REFUNDED') statusBadge = 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+
+      const orderDate = this.formatRelativeTime(order.createdAt);
+      const itemsCount = Array.isArray(order.items) ? order.items.length : 0;
+      const price = Number(order.totalPrice || 0).toFixed(2);
+
+      return `
+        <div class="user-order-item cursor-pointer p-3 rounded-xl bg-[#0d0d10] hover:bg-zinc-800/80 border border-zinc-800/90 hover:border-zinc-700 transition flex items-center justify-between group" data-order-id="${order.id}">
+          <div class="min-w-0 pr-2 space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-white text-xs group-hover:text-blue-400 transition">Order #${order.id}</span>
+              <span class="${statusBadge} text-[9px] font-bold px-1.5 py-0.2 rounded-full border">${this._escape(status)}</span>
+            </div>
+            <div class="text-[10px] text-zinc-500 font-mono flex items-center gap-1.5 truncate">
+              <span>${orderDate || 'Recent'}</span>
+              <span>•</span>
+              <span>${itemsCount} item(s)</span>
+            </div>
+          </div>
+          <div class="text-right shrink-0">
+            <div class="text-xs font-bold text-white font-mono">$${price}</div>
+            <span class="text-[10px] text-zinc-400 group-hover:text-white flex items-center justify-end gap-1 mt-0.5 transition">
+              Details <i class="fa-solid fa-chevron-right text-[8px]"></i>
+            </span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  renderOrderDetailsModal(order) {
+    if (!order) return;
+    let modalContainer = document.getElementById('modal-container');
+    if (!modalContainer) {
+      modalContainer = document.createElement('div');
+      modalContainer.id = 'modal-container';
+      document.body.appendChild(modalContainer);
+    }
+
+    const status = String(order.status || 'CONFIRMED').toUpperCase();
+    let statusBadge = 'bg-zinc-800 text-zinc-400 border-zinc-700';
+    if (status === 'CONFIRMED') statusBadge = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+    else if (status === 'PENDING') statusBadge = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+    else if (status === 'CANCELLED' || status === 'REFUNDED') statusBadge = 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+
+    const items = Array.isArray(order.items) ? order.items : [];
+    const itemsRows = items.length > 0 ? items.map(item => {
+      const unitPrice = Number(item.unitPrice || 0);
+      const qty = Number(item.quantity || 1);
+      const subtotal = (unitPrice * qty).toFixed(2);
+
+      return `
+        <tr class="hover:bg-zinc-800/30 transition text-zinc-300">
+          <td class="p-3 font-medium text-white flex flex-col">
+            <span>${this._escape(item.productName || 'Product')}</span>
+            <span class="text-[10px] text-zinc-500 font-mono">Variant ID #${item.productVariantId || 'N/A'}</span>
+          </td>
+          <td class="p-3 font-mono text-[11px] text-zinc-400">${this._escape(item.sku || 'N/A')}</td>
+          <td class="p-3 text-center font-mono font-semibold">${qty}</td>
+          <td class="p-3 text-right font-mono">$${unitPrice.toFixed(2)}</td>
+          <td class="p-3 text-right font-mono font-bold text-white">$${subtotal}</td>
+        </tr>
+      `;
+    }).join('') : `
+      <tr>
+        <td colspan="5" class="p-4 text-center text-zinc-500">No individual line items listed.</td>
+      </tr>
+    `;
+
+    modalContainer.innerHTML = `
+      <div id="order-details-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+        <div class="relative w-full max-w-2xl bg-[#111114] border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+          <!-- Modal Header -->
+          <div class="px-6 py-4 border-b border-zinc-800 flex items-center justify-between bg-[#0d0d10]">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                <i class="fa-solid fa-receipt text-sm"></i>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h2 class="text-sm font-bold text-white">Order #${order.id}</h2>
+                  <span class="${statusBadge} text-[10px] font-bold px-2 py-0.5 rounded-full border">${this._escape(status)}</span>
+                </div>
+                <p class="text-[11px] text-zinc-500 font-mono mt-0.5">Date: ${new Date(order.createdAt).toLocaleString()}</p>
+              </div>
+            </div>
+            <button id="close-order-modal-btn" type="button" class="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition cursor-pointer">
+              <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+          </div>
+
+          <!-- Modal Body (Scrollable) -->
+          <div class="p-6 overflow-y-auto space-y-5 text-xs">
+            <!-- Customer & Shipping Information -->
+            <div>
+              <h4 class="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2 flex items-center gap-1.5">
+                <i class="fa-solid fa-truck text-zinc-500"></i> Shipping & Customer Information
+              </h4>
+              <div class="bg-[#0d0d10] border border-zinc-800 rounded-xl p-3.5 space-y-2">
+                <div class="flex justify-between items-center">
+                  <span class="text-zinc-500">Customer Name</span>
+                  <span class="text-white font-semibold">${this._escape(order.shippingInfo?.customerName || 'N/A')}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-zinc-500">Phone Number</span>
+                  <span class="text-white font-mono">${this._escape(order.shippingInfo?.phoneNumber || 'N/A')}</span>
+                </div>
+                <div class="flex justify-between items-start">
+                  <span class="text-zinc-500 shrink-0 mr-4">Delivery Address</span>
+                  <span class="text-white text-right">${this._escape(order.shippingInfo?.address || 'N/A')}</span>
+                </div>
+                <div class="flex justify-between items-center border-t border-zinc-800/80 pt-2 text-[11px]">
+                  <span class="text-zinc-500">Sender ID</span>
+                  <span class="text-zinc-400 font-mono truncate max-w-xs">${this._escape(order.senderId || 'N/A')}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Order Items -->
+            <div>
+              <h4 class="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2 flex items-center gap-1.5">
+                <i class="fa-solid fa-box text-zinc-500"></i> Order Items (${items.length})
+              </h4>
+              <div class="border border-zinc-800 rounded-xl overflow-hidden">
+                <table class="w-full text-left">
+                  <thead class="bg-[#0d0d10] text-zinc-500 text-[10px] uppercase font-mono border-b border-zinc-800">
+                    <tr>
+                      <th class="p-3">Product</th>
+                      <th class="p-3">SKU</th>
+                      <th class="p-3 text-center">Qty</th>
+                      <th class="p-3 text-right">Unit Price</th>
+                      <th class="p-3 text-right">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-zinc-800/60 bg-[#111114]">
+                    ${itemsRows}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Financial Summary -->
+            <div class="bg-[#0d0d10] border border-zinc-800 rounded-xl p-4 space-y-2">
+              <div class="flex justify-between text-zinc-400 items-center">
+                <span class="font-medium">Total Order Amount</span>
+                <span class="text-lg font-extrabold text-emerald-400 font-mono">$${Number(order.totalPrice || 0).toFixed(2)}</span>
+              </div>
+              <div class="flex justify-between text-[11px] text-zinc-500 border-t border-zinc-800/80 pt-2">
+                <span>Associated Cart ID</span>
+                <span class="font-mono text-zinc-400">Cart #${order.cartId || 'N/A'}</span>
+              </div>
+              <div class="flex justify-between text-[11px] text-zinc-500">
+                <span>Associated Chat ID</span>
+                <span class="font-mono text-zinc-400">Chat #${order.chatId || 'N/A'}</span>
+              </div>
+              <div class="flex justify-between text-[11px] text-zinc-500">
+                <span>Workspace ID</span>
+                <span class="font-mono text-zinc-400">Workspace #${order.workspaceId || 'N/A'}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Modal Footer -->
+          <div class="px-6 py-3 border-t border-zinc-800 bg-[#0d0d10] flex justify-end">
+            <button id="close-order-modal-btn-footer" type="button" class="bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-semibold px-4 py-2 rounded-xl transition cursor-pointer">
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Modal close listeners
+    const modalEl = document.getElementById('order-details-modal');
+    const closeBtn = document.getElementById('close-order-modal-btn');
+    const closeFooterBtn = document.getElementById('close-order-modal-btn-footer');
+
+    const handleClose = () => this.closeOrderDetailsModal();
+    if (closeBtn) closeBtn.addEventListener('click', handleClose);
+    if (closeFooterBtn) closeFooterBtn.addEventListener('click', handleClose);
+    if (modalEl) {
+      modalEl.addEventListener('click', (e) => {
+        if (e.target === modalEl) handleClose();
+      });
+    }
+
+    if (this._modalEscListener) {
+      window.removeEventListener('keydown', this._modalEscListener);
+    }
+    this._modalEscListener = (e) => {
+      if (e.key === 'Escape') handleClose();
+    };
+    window.addEventListener('keydown', this._modalEscListener);
+  }
+
+  closeOrderDetailsModal() {
+    const modalContainer = document.getElementById('modal-container');
+    if (modalContainer) {
+      modalContainer.innerHTML = '';
+    }
+    if (this._modalEscListener) {
+      window.removeEventListener('keydown', this._modalEscListener);
+      this._modalEscListener = null;
+    }
+  }
+
+  bindUserOrderClick(handler) {
+    if (this.activeChatContext) {
+      this.activeChatContext.addEventListener('click', (e) => {
+        const item = e.target.closest('.user-order-item');
+        if (item && item.dataset.orderId) {
+          handler(item.dataset.orderId);
+        }
+      });
+    }
+  }
 }
+

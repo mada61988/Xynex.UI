@@ -330,6 +330,13 @@ export class DashboardModel {
   }
 
   /**
+   * Fetches orders by sender ID from GET /orders/sender/:senderId
+   */
+  async fetchOrdersBySender(senderId) {
+    return await this.apiService.fetchOrdersBySender(senderId);
+  }
+
+  /**
    * Fetches user workspaces from /workspaces/user/:clerkId
    * Extracts all channels across all workspaces/profiles and computes channel metrics.
    * Stores the workspaces from the first call to prevent redundant requests.

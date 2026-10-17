@@ -36,7 +36,27 @@ export class ChatModel {
     const channelId = chat.channelId ?? defaults.channelId ?? null;
     const channelName = chat.channelName || defaults.channelName || (channelId ? `Channel #${channelId}` : 'Direct');
     const platform = (chat.platform || defaults.platform || 'webchat').toLowerCase();
-    const snippet = chat.lastMessageSnippet || chat.last_message_snippet || chat.snippet || chat.lastMessage || 'No messages yet';
+    
+    let snippet = chat.lastMessageSnippet || chat.last_message_snippet || chat.snippet || chat.lastMessage || '';
+    if (!snippet && Array.isArray(chat.messages) && chat.messages.length > 0) {
+      const lastMsg = chat.messages[chat.messages.length - 1];
+      snippet = lastMsg.text || lastMsg.content || '';
+      if (!snippet) {
+        if (lastMsg.imageUrl || lastMsg.type === 'image') snippet = '📷 Photo';
+        else if (lastMsg.videoUrl || lastMsg.type === 'video') snippet = '🎥 Video';
+        else if (lastMsg.voiceNoteUrl || lastMsg.audioUrl || lastMsg.type === 'audio') snippet = '🎤 Voice note';
+        else if (lastMsg.fileUrl || lastMsg.type === 'file') snippet = '📎 Document';
+        else if (lastMsg.locationCoordinates) snippet = '📍 Location';
+        else if (lastMsg.stickerId) snippet = '🙂 Sticker';
+      }
+    }
+    if (!snippet) {
+      if (chat.type === 'image' || chat.imageUrl) snippet = '📷 Photo';
+      else if (chat.type === 'video' || chat.videoUrl) snippet = '🎥 Video';
+      else if (chat.type === 'audio' || chat.voiceNoteUrl) snippet = '🎤 Voice note';
+      else snippet = 'No messages yet';
+    }
+
     const timestamp = chat.lastMessageTimestamp || chat.last_message_timestamp || chat.updatedAt || chat.createdAt || null;
     const cartId = chat.cartId || chat.cart_id || (chat.cart && chat.cart.id) || null;
 

@@ -205,12 +205,136 @@ export class ChatView {
     }
   }
 
+  _buildMediaAttachmentHtml(msg, isAgent) {
+    let mediaHtml = '';
+
+    // 1. Image
+    if (msg.imageUrl) {
+      mediaHtml += `
+        <div class="rounded-xl overflow-hidden mb-2 border border-white/10 max-w-xs sm:max-w-sm bg-black/40 shadow-sm">
+          <a href="${this._escape(msg.imageUrl)}" target="_blank" rel="noopener noreferrer" class="block group relative" title="Click to view full image">
+            <img src="${this._escape(msg.imageUrl)}" alt="Attached image" class="max-w-full max-h-72 object-cover rounded-xl transition-transform duration-200 group-hover:scale-[1.02]" loading="lazy" />
+            <div class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white">
+              <i class="fa-solid fa-up-right-from-square text-xs bg-black/60 p-2 rounded-lg"></i>
+            </div>
+          </a>
+        </div>
+      `;
+    } else if (msg.type === 'image') {
+      mediaHtml += `
+        <div class="flex items-center gap-2 p-2.5 rounded-xl ${isAgent ? 'bg-blue-600/40' : 'bg-zinc-900/60'} border border-white/10 text-xs text-zinc-300 mb-1.5">
+          <i class="fa-regular fa-image text-zinc-400"></i>
+          <span>Photo attachment</span>
+        </div>
+      `;
+    }
+
+    // 2. Video
+    if (msg.videoUrl) {
+      mediaHtml += `
+        <div class="rounded-xl overflow-hidden mb-2 border border-white/10 max-w-xs sm:max-w-sm bg-black shadow-sm">
+          <video src="${this._escape(msg.videoUrl)}" controls preload="metadata" class="max-w-full max-h-72 rounded-xl"></video>
+        </div>
+      `;
+    }
+
+    // 3. Audio / Voice Note
+    const audioSrc = msg.voiceNoteUrl || msg.audioUrl;
+    if (audioSrc) {
+      mediaHtml += `
+        <div class="flex items-center gap-2.5 p-2 rounded-xl ${isAgent ? 'bg-blue-600/50' : 'bg-zinc-900/80'} border border-white/10 mb-2 max-w-[280px]">
+          <div class="w-7 h-7 rounded-full ${isAgent ? 'bg-white/20 text-white' : 'bg-zinc-800 text-blue-400'} flex items-center justify-center shrink-0">
+            <i class="fa-solid fa-microphone text-[10px]"></i>
+          </div>
+          <audio src="${this._escape(audioSrc)}" controls class="h-8 max-w-[210px] filter invert contrast-125"></audio>
+        </div>
+      `;
+    }
+
+    // 4. File / Document
+    if (msg.fileUrl) {
+      let fileName = 'Attachment Document';
+      try {
+        const parts = msg.fileUrl.split('/');
+        fileName = decodeURIComponent(parts[parts.length - 1].split('?')[0]) || fileName;
+      } catch (_) {}
+
+      mediaHtml += `
+        <a href="${this._escape(msg.fileUrl)}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 p-2.5 rounded-xl ${isAgent ? 'bg-blue-600/40 hover:bg-blue-600/60' : 'bg-zinc-900/80 hover:bg-zinc-800'} border border-white/10 transition group mb-2 max-w-xs">
+          <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0 text-white">
+            <i class="fa-solid fa-file-arrow-down text-xs"></i>
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="font-medium text-xs text-white truncate group-hover:underline">${this._escape(fileName)}</div>
+            <div class="text-[10px] text-zinc-400 flex items-center gap-1 mt-0.5">
+              <span>Click to view file</span>
+            </div>
+          </div>
+        </a>
+      `;
+    }
+
+    // 5. Location Coordinates
+    if (msg.locationCoordinates) {
+      let lat = null, lng = null;
+      if (typeof msg.locationCoordinates === 'object' && msg.locationCoordinates !== null) {
+        lat = msg.locationCoordinates.latitude ?? msg.locationCoordinates.lat;
+        lng = msg.locationCoordinates.longitude ?? msg.locationCoordinates.lng;
+      } else if (typeof msg.locationCoordinates === 'string') {
+        const coords = msg.locationCoordinates.split(',');
+        if (coords.length >= 2) {
+          lat = coords[0].trim();
+          lng = coords[1].trim();
+        }
+      }
+
+      if (lat && lng) {
+        mediaHtml += `
+          <a href="https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 p-2.5 rounded-xl ${isAgent ? 'bg-blue-600/40 hover:bg-blue-600/60' : 'bg-zinc-900/80 hover:bg-zinc-800'} border border-white/10 transition group mb-2 max-w-xs">
+            <div class="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-location-dot text-xs"></i>
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="font-semibold text-xs text-white">Shared Location</div>
+              <div class="text-[10px] text-zinc-400 font-mono mt-0.5">${this._escape(lat)}, ${this._escape(lng)}</div>
+            </div>
+            <i class="fa-solid fa-arrow-up-right-from-square text-zinc-400 text-[10px]"></i>
+          </a>
+        `;
+      }
+    }
+
+    // 6. Sticker
+    if (msg.stickerId) {
+      const isUrl = String(msg.stickerId).startsWith('http://') || String(msg.stickerId).startsWith('https://');
+      if (isUrl) {
+        mediaHtml += `
+          <div class="mb-2">
+            <img src="${this._escape(msg.stickerId)}" alt="Sticker" class="w-24 h-24 object-contain" loading="lazy" />
+          </div>
+        `;
+      } else {
+        mediaHtml += `
+          <div class="flex items-center gap-2 p-2 rounded-xl bg-zinc-900/60 border border-zinc-700/50 text-xs text-zinc-300 mb-2">
+            <i class="fa-regular fa-face-smile text-amber-400 text-sm"></i>
+            <span>Sticker #${this._escape(msg.stickerId)}</span>
+          </div>
+        `;
+      }
+    }
+
+    return mediaHtml;
+  }
+
   _buildMessageBubbleHtml(msg, chat) {
     const sender = String(msg.sender || '').toLowerCase().trim();
     const isAgent = sender === 'agent' || sender === 'bot' || sender === 'ai';
     const msgText = this._escape(msg.text || msg.content || msg.body || '');
     const msgTime = this.formatRelativeTime(msg.createdAt || msg.timestamp);
     const customerName = this._escape(chat.userName || chat.user_name || chat.title || 'Customer');
+
+    const mediaHtml = this._buildMediaAttachmentHtml(msg, isAgent);
+    const textHtml = msgText ? `<div class="leading-relaxed break-words">${msgText}</div>` : '';
 
     if (isAgent) {
       // Outgoing message for agent: displayed in blue background like Instagram DM with explicit sender tag
@@ -222,7 +346,8 @@ export class ChatView {
             ${msgTime ? `<span class="text-zinc-500 font-normal font-mono">• ${msgTime}</span>` : ''}
           </div>
           <div class="bg-[#0084ff] text-white p-3.5 rounded-2xl rounded-tr-sm text-xs shadow-md leading-relaxed break-words font-normal">
-            ${msgText}
+            ${mediaHtml}
+            ${textHtml}
           </div>
         </div>
       `;
@@ -237,7 +362,8 @@ export class ChatView {
           ${msgTime ? `<span class="text-zinc-500 font-normal font-mono">• ${msgTime}</span>` : ''}
         </div>
         <div class="bg-zinc-800 text-zinc-100 p-3.5 rounded-2xl rounded-tl-sm text-xs border border-zinc-700/60 leading-relaxed break-words shadow-sm">
-          ${msgText}
+          ${mediaHtml}
+          ${textHtml}
         </div>
       </div>
     `;

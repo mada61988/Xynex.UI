@@ -1,3 +1,5 @@
+import { ChatsController } from './ChatsController.js';
+
 export class DashboardController {
   constructor(model, view, authModel = null) {
     this.model = model;
@@ -8,6 +10,7 @@ export class DashboardController {
     this.lastMessagesSyncedTime = null;
     this.currentSelectedWorkspaceId = 'all';
     this.cachedOverallData = null;
+    this.chatsController = new ChatsController(this.authModel, this.model);
   }
 
   async init() {
@@ -386,6 +389,11 @@ export class DashboardController {
       }
     } else if (target === 'create-workspace') {
       this.view.showSection('create-workspace');
+    } else if (target === 'conversations' || target === 'chats') {
+      this.view.showSection('conversations');
+      if (this.chatsController) {
+        await this.chatsController.init();
+      }
     } else {
       // Default to overview section
       this.view.showSection('overview');

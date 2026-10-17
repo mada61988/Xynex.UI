@@ -49,6 +49,9 @@ export class DashboardView {
     this.formCreateChannel = document.getElementById('form-create-channel');
     this.onOpenCreateChannelCallback = null;
 
+    // Conversations Section
+    this.conversationsSection = document.getElementById('section-conversations');
+
     // Callbacks for role editing
     this.onEditRoleClick = null;
     this.onSaveRoleClick = null;
@@ -558,6 +561,7 @@ export class DashboardView {
     if (this.workspaceDetailSection) this.workspaceDetailSection.classList.add('hidden');
     if (this.createWorkspaceSection) this.createWorkspaceSection.classList.add('hidden');
     if (this.createChannelSection) this.createChannelSection.classList.add('hidden');
+    if (this.conversationsSection) this.conversationsSection.classList.add('hidden');
 
     const isOverview = (sectionName === 'overview' || !sectionName || sectionName === '');
 
@@ -565,6 +569,11 @@ export class DashboardView {
       if (this.usersSection) this.usersSection.classList.remove('hidden');
       this.renderHeaderBreadcrumbs([
         { label: 'Users Directory', icon: '<i class="fa-solid fa-user text-xs text-zinc-400"></i>' }
+      ]);
+    } else if (sectionName === 'conversations' || sectionName === 'chats') {
+      if (this.conversationsSection) this.conversationsSection.classList.remove('hidden');
+      this.renderHeaderBreadcrumbs([
+        { label: 'Conversations', icon: '<i class="fa-solid fa-comments text-xs text-zinc-400"></i>' }
       ]);
     } else if (sectionName === 'workspaces' || sectionName === 'chatbots') {
       if (this.workspacesSection) this.workspacesSection.classList.remove('hidden');

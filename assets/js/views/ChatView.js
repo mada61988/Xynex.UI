@@ -39,25 +39,39 @@ export class ChatView {
     }
   }
 
-  formatChatTimestamp(ts) {
+  /**
+   * Formats a timestamp into relative time (e.g. "2m ago", "15s ago", "3h ago")
+   */
+  formatRelativeTime(ts) {
     if (!ts) return '';
     const date = new Date(ts);
     if (isNaN(date.getTime())) return '';
 
     const now = new Date();
-    const isToday = date.toDateString() === now.toDateString();
+    const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-    const yesterday = new Date(now);
-    yesterday.setDate(now.getDate() - 1);
-    const isYesterday = date.toDateString() === yesterday.toDateString();
+    if (diffSec < 0) return 'just now';
+    if (diffSec < 60) return `${Math.max(1, diffSec)}s ago`;
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays}d ago`;
+    const diffWeeks = Math.floor(diffDays / 7);
+    if (diffWeeks < 4) return `${diffWeeks}w ago`;
 
-    if (isToday) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } else if (isYesterday) {
-      return 'Yesterday';
-    } else {
-      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    }
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  }
+
+  formatChatTimestamp(ts) {
+    return this.formatRelativeTime(ts);
+  }
+
+  _formatChannelLabel(ch) {
+    const platform = (ch.platform || 'Channel').toUpperCase();
+    const name = ch.name || ch.metaPageId || `ID #${ch.id}`;
+    return `${platform} (${name})`;
   }
 
   renderThreadCardHtml(chat, isActive) {
@@ -66,18 +80,18 @@ export class ChatView {
       : 'p-4 hover:bg-zinc-800/20 border-l-2 border-l-transparent cursor-pointer transition';
 
     const platformIcon = this.getPlatformIcon(chat.platform);
-    const formattedTime = this.formatChatTimestamp(chat.timestamp);
-    const title = this._escape(chat.title);
-    const snippet = this._escape(chat.snippet);
-    const workspaceName = this._escape(chat.workspaceName);
+    const relativeTime = this.formatRelativeTime(chat.lastMessageTimestamp || chat.timestamp);
+    const heading = this._escape(chat.user_name || chat.title || 'Customer');
+    const snippet = this._escape(chat.lastMessageSnippet || chat.snippet || 'No message snippet');
+    const workspaceName = this._escape(chat.workspaceName || 'Workspace');
 
-    // Context badge (Cart / Order status or channel type)
+    // Context badge (Cart / Order status or platform badge)
     let badgeHtml = '';
     if (chat.cartId || chat.cart) {
       const cartNum = chat.cartId || (chat.cart && chat.cart.id) || 502;
-      badgeHtml = `<span class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold px-2 py-0.5 rounded-full">Cart #${this._escape(cartNum)}</span>`;
+      badgeHtml = `<span class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold px-2 py-0.5 rounded-full text-[10px]">Cart #${this._escape(cartNum)}</span>`;
     } else {
-      badgeHtml = `<span class="bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full border border-zinc-700 capitalize">${this._escape(chat.platform || 'Inquiry')}</span>`;
+      badgeHtml = `<span class="bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full border border-zinc-700 capitalize text-[10px]">${this._escape(chat.platform || 'Direct')}</span>`;
     }
 
     return `
@@ -85,9 +99,9 @@ export class ChatView {
         <div class="flex justify-between items-start mb-1.5">
           <div class="flex items-center gap-2 min-w-0 pr-2">
             ${platformIcon}
-            <span class="font-bold text-white text-xs truncate max-w-[140px]">${title}</span>
+            <span class="font-bold text-white text-xs truncate max-w-[140px]">${heading}</span>
           </div>
-          <span class="text-[10px] text-zinc-500 font-mono shrink-0">${formattedTime}</span>
+          <span class="text-[10px] text-zinc-500 font-mono shrink-0">${relativeTime}</span>
         </div>
         <div class="text-xs text-zinc-300 truncate mb-2">${snippet}</div>
         <div class="flex items-center justify-between text-[10px]">
@@ -176,18 +190,19 @@ export class ChatView {
     }
   }
 
-  renderActiveChat(chat) {
+  renderActiveChat(chat, messages = null) {
     if (!this.activeChatContainer) return;
 
-    const title = this._escape(chat.title);
+    const heading = this._escape(chat.user_name || chat.title || 'Customer');
     const platform = this._escape(chat.platform || 'webchat');
     const workspaceName = this._escape(chat.workspaceName || 'Workspace');
     const channelId = this._escape(chat.channelId || 'ch_default');
-    const snippet = this._escape(chat.snippet || 'No message snippet');
-    const timestamp = this.formatChatTimestamp(chat.timestamp);
+    const channelName = this._escape(chat.channelName || platform);
+    const snippet = this._escape(chat.lastMessageSnippet || chat.snippet || 'No message snippet');
+    const relativeTime = this.formatRelativeTime(chat.lastMessageTimestamp || chat.timestamp);
 
     // Generate Initials
-    const initials = title
+    const initials = heading
       .split(' ')
       .map(w => w.charAt(0))
       .slice(0, 2)
@@ -204,37 +219,41 @@ export class ChatView {
     };
     const pillClass = platformColors[platform.toLowerCase()] || 'bg-zinc-800 text-zinc-300 border-zinc-700';
 
-    // PANE 2: Live Chat Timeline
-    this.activeChatContainer.innerHTML = `
-      <!-- Active Chat Header -->
-      <div class="h-14 border-b border-zinc-800 px-6 flex items-center justify-between shrink-0 bg-[#0d0d10]">
-        <div class="flex items-center gap-3 min-w-0">
-          <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 p-0.5 shrink-0">
-            <div class="w-full h-full bg-[#111114] rounded-full flex items-center justify-center text-xs font-bold text-white">
-              ${initials}
+    // Build timeline messages HTML
+    let messagesHtml = '';
+    if (Array.isArray(messages) && messages.length > 0) {
+      messagesHtml = messages.map(msg => {
+        const isBot = msg.sender === 'agent' || msg.sender === 'bot' || msg.isBot;
+        const msgText = this._escape(msg.content || msg.text || msg.body || '');
+        const msgTime = this.formatRelativeTime(msg.timestamp || msg.createdAt);
+        const senderLabel = isBot ? 'Xynex AI' : heading;
+
+        if (isBot) {
+          return `
+            <div class="flex flex-col items-end max-w-md ml-auto">
+              <span class="text-[10px] text-zinc-500 mb-1">${senderLabel} • ${msgTime}</span>
+              <div class="bg-white text-black font-medium p-3 rounded-2xl rounded-tr-sm text-xs shadow-sm leading-relaxed">
+                ${msgText}
+              </div>
+            </div>
+          `;
+        }
+
+        return `
+          <div class="flex flex-col items-start max-w-md">
+            <span class="text-[10px] text-zinc-500 mb-1">${senderLabel} • ${msgTime}</span>
+            <div class="bg-zinc-800 text-white p-3 rounded-2xl rounded-tl-sm text-xs border border-zinc-700/60 leading-relaxed">
+              ${msgText}
             </div>
           </div>
-          <div class="min-w-0">
-            <div class="text-xs font-bold text-white flex items-center gap-2 truncate">
-              <span class="truncate">${title}</span>
-              <span class="${pillClass} border text-[10px] px-1.5 py-0.2 rounded capitalize shrink-0">${platform}</span>
-            </div>
-            <div class="text-[10px] text-zinc-500 font-mono truncate">Channel ID: ${channelId} • Workspace: ${workspaceName}</div>
-          </div>
-        </div>
-
-        <!-- Bot Pause Toggle -->
-        <button type="button" class="bg-zinc-900 border border-zinc-700 hover:border-rose-500/50 text-xs text-zinc-300 hover:text-white px-3 py-1.5 rounded-xl transition flex items-center gap-2 shrink-0">
-          <i class="fa-solid fa-hand text-rose-400"></i>
-          <span class="hidden sm:inline">Pause AI Agent</span>
-        </button>
-      </div>
-
-      <!-- Chat Stream -->
-      <div class="flex-1 overflow-y-auto p-6 space-y-5">
+        `;
+      }).join('');
+    } else {
+      // Default initial message stream view
+      messagesHtml = `
         <!-- Customer Msg -->
         <div class="flex flex-col items-start max-w-md">
-          <span class="text-[10px] text-zinc-500 mb-1">Customer • ${timestamp}</span>
+          <span class="text-[10px] text-zinc-500 mb-1">${heading} • ${relativeTime}</span>
           <div class="bg-zinc-800 text-white p-3 rounded-2xl rounded-tl-sm text-xs border border-zinc-700/60 leading-relaxed">
             ${snippet}
           </div>
@@ -251,31 +270,64 @@ export class ChatView {
 
         <!-- AI Bot Msg -->
         <div class="flex flex-col items-end max-w-md ml-auto">
-          <span class="text-[10px] text-zinc-500 mb-1">Xynex AI • Just now</span>
+          <span class="text-[10px] text-zinc-500 mb-1">Xynex AI • ${relativeTime}</span>
           <div class="bg-white text-black font-medium p-3 rounded-2xl rounded-tr-sm text-xs shadow-sm leading-relaxed">
-            I am currently handling customer inquiries on ${platform}. Live catalog SKU checkout links are dispatched directly to the customer.
+            I am actively assisting this customer on ${platform}. Real-time catalog checkout links are dispatched directly.
           </div>
         </div>
+      `;
+    }
+
+    // PANE 2: Live Chat Timeline
+    this.activeChatContainer.innerHTML = `
+      <!-- Active Chat Header -->
+      <div class="h-14 border-b border-zinc-800 px-6 flex items-center justify-between shrink-0 bg-[#0d0d10]">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 p-0.5 shrink-0">
+            <div class="w-full h-full bg-[#111114] rounded-full flex items-center justify-center text-xs font-bold text-white">
+              ${initials}
+            </div>
+          </div>
+          <div class="min-w-0">
+            <div class="text-xs font-bold text-white flex items-center gap-2 truncate">
+              <span class="truncate">${heading}</span>
+              <span class="${pillClass} border text-[10px] px-1.5 py-0.2 rounded capitalize shrink-0">${platform}</span>
+            </div>
+            <div class="text-[10px] text-zinc-500 font-mono truncate">Channel: ${channelName} • Workspace: ${workspaceName}</div>
+          </div>
+        </div>
+
+        <!-- Bot Pause Toggle -->
+        <button type="button" class="bg-zinc-900 border border-zinc-700 hover:border-rose-500/50 text-xs text-zinc-300 hover:text-white px-3 py-1.5 rounded-xl transition flex items-center gap-2 shrink-0 cursor-pointer">
+          <i class="fa-solid fa-hand text-rose-400"></i>
+          <span class="hidden sm:inline">Pause AI Agent</span>
+        </button>
       </div>
 
-      <!-- Chat Input -->
+      <!-- Chat Stream -->
+      <div id="active-chat-stream" class="flex-1 overflow-y-auto p-6 space-y-5">
+        ${messagesHtml}
+      </div>
+
+      <!-- Chat Input Intervene -->
       <div class="p-4 border-t border-zinc-800 bg-[#0d0d10]">
         <div class="relative">
           <input type="text" placeholder="AI Agent is actively handling this thread. Type here to intervene..." class="w-full bg-[#111114] border border-zinc-800 rounded-xl pl-4 pr-20 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-700">
-          <button type="button" class="absolute right-2 top-1.5 bg-zinc-800 text-zinc-400 hover:text-white px-3 py-1 rounded-lg text-xs font-semibold transition">Send</button>
+          <button type="button" class="absolute right-2 top-1.5 bg-zinc-800 text-zinc-400 hover:text-white px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer">Send</button>
         </div>
       </div>
     `;
 
     // PANE 3: Context & Metadata
     if (this.activeChatContext) {
+      const cartNum = chat.cartId || (chat.cart && chat.cart.id) || 502;
       this.activeChatContext.innerHTML = `
         <!-- Active Order State -->
         <div>
           <h3 class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-3">Active Order State</h3>
           <div class="bg-[#111114] border border-zinc-800 rounded-2xl p-4 space-y-3 shadow-sm">
             <div class="flex justify-between items-center">
-              <span class="text-xs font-bold text-white">Cart #${this._escape(chat.cartId || 502)}</span>
+              <span class="text-xs font-bold text-white">Cart #${this._escape(cartNum)}</span>
               <span class="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">CONFIRMED</span>
             </div>
             <div class="border-t border-zinc-800/80 pt-2 flex justify-between text-xs">
@@ -290,11 +342,15 @@ export class ChatView {
           <h3 class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-3">Channel Telemetry</h3>
           <div class="bg-[#111114] border border-zinc-800 rounded-2xl p-4 space-y-2.5 text-xs shadow-sm">
             <div class="flex justify-between">
-              <span class="text-zinc-400">Channel</span>
+              <span class="text-zinc-400">Platform</span>
               <span class="text-white font-medium capitalize flex items-center gap-1.5">
                 ${this.getPlatformIcon(chat.platform)}
                 ${platform}
               </span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-zinc-400">Channel ID</span>
+              <span class="text-white font-mono">#${channelId}</span>
             </div>
             <div class="flex justify-between">
               <span class="text-zinc-400">Latency</span>
@@ -308,6 +364,42 @@ export class ChatView {
         </div>
       `;
     }
+  }
+
+  renderChatMessages(chat, messages) {
+    const stream = document.getElementById('active-chat-stream');
+    if (!stream || !Array.isArray(messages) || messages.length === 0) return;
+
+    const heading = this._escape(chat.user_name || chat.title || 'Customer');
+
+    stream.innerHTML = messages.map(msg => {
+      const isBot = msg.sender === 'agent' || msg.sender === 'bot' || msg.isBot;
+      const msgText = this._escape(msg.content || msg.text || msg.body || '');
+      const msgTime = this.formatRelativeTime(msg.timestamp || msg.createdAt);
+      const senderLabel = isBot ? 'Xynex AI' : heading;
+
+      if (isBot) {
+        return `
+          <div class="flex flex-col items-end max-w-md ml-auto">
+            <span class="text-[10px] text-zinc-500 mb-1">${senderLabel} • ${msgTime}</span>
+            <div class="bg-white text-black font-medium p-3 rounded-2xl rounded-tr-sm text-xs shadow-sm leading-relaxed">
+              ${msgText}
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="flex flex-col items-start max-w-md">
+          <span class="text-[10px] text-zinc-500 mb-1">${senderLabel} • ${msgTime}</span>
+          <div class="bg-zinc-800 text-white p-3 rounded-2xl rounded-tl-sm text-xs border border-zinc-700/60 leading-relaxed">
+            ${msgText}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    stream.scrollTop = stream.scrollHeight;
   }
 
   renderNoActiveChat() {
@@ -341,6 +433,21 @@ export class ChatView {
     `).join('');
 
     this.filterWorkspace.innerHTML = optionsHtml;
+  }
+
+  populateChannelFilterOptions(channels, currentSelectedId = 'all') {
+    if (!this.filterChannel) return;
+    const chList = Array.isArray(channels) ? channels : [];
+
+    let optionsHtml = `<option value="all" class="bg-[#111114] text-white">All Channels</option>`;
+    optionsHtml += chList.map(ch => `
+      <option value="${ch.id}" class="bg-[#111114] text-white" ${String(ch.id) === String(currentSelectedId) ? 'selected' : ''}>
+        ${this._escape(this._formatChannelLabel(ch))}
+      </option>
+    `).join('');
+
+    this.filterChannel.innerHTML = optionsHtml;
+    this.filterChannel.value = String(currentSelectedId || 'all');
   }
 
   updateScopeSummary(workspaceText, channelText) {

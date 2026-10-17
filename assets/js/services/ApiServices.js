@@ -54,10 +54,11 @@ export class ApiService {
     return await response.json();
   }
 
-  async fetchChats({ workspaceId = 'all', limit = 10, offset = 0 } = {}) {
+  async fetchChats({ workspaceId = 'all', channelId = 'all', limit = 10, offset = 0 } = {}) {
     const headers = await this.getHeaders();
     const params = new URLSearchParams({
       workspaceId: String(workspaceId),
+      channelId: String(channelId),
       limit: String(limit),
       offset: String(offset)
     });
@@ -86,6 +87,26 @@ export class ApiService {
     }
 
     return await response.json();
+  }
+
+  async fetchChatMessages(chatId) {
+    if (!chatId) return null;
+    try {
+      const headers = await this.getHeaders();
+      const response = await fetch(`${CONFIG.API_BASE_URL}/chats/${encodeURIComponent(chatId)}/messages`, {
+        method: 'GET',
+        headers
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      return await response.json();
+    } catch (err) {
+      console.warn("ApiService: fetchChatMessages failed:", err);
+      return null;
+    }
   }
 
   async fetchUserMessagesCount(clerkId) {

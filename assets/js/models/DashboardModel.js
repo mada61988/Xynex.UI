@@ -309,6 +309,20 @@ export class DashboardModel {
   }
 
   /**
+   * Fetches chats with workspaceId, channelId, limit, and offset query parameters.
+   */
+  async fetchChats({ workspaceId = 'all', channelId = 'all', limit = 10, offset = 0 } = {}) {
+    return await this.apiService.fetchChats({ workspaceId, channelId, limit, offset });
+  }
+
+  /**
+   * Fetches full messages history for a specific chat.
+   */
+  async fetchChatMessages(chatId) {
+    return await this.apiService.fetchChatMessages(chatId);
+  }
+
+  /**
    * Fetches user workspaces from /workspaces/user/:clerkId
    * Extracts all channels across all workspaces/profiles and computes channel metrics.
    * Stores the workspaces from the first call to prevent redundant requests.

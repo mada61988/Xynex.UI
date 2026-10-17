@@ -8,6 +8,7 @@ export class ChatsController {
     this.model = new ChatModel();
     this.view = new ChatView();
     this.isInitialized = false;
+    this.workspacesCache = [];
     this.observer = null;
   }
 
@@ -18,10 +19,10 @@ export class ChatsController {
       this.isInitialized = true;
     }
 
-    // 2. Populate workspace options in filter dropdown
+    // 2. Populate workspace options in filter dropdown and initial channel options
     await this.loadWorkspaceFilterOptions();
 
-    // 3. Initial Load: fetch workspaceId=all, limit=10, offset=0
+    // 3. Initial Load: fetch with workspaceId=all, channelId=all, limit=10, offset=0
     if (this.model.chats.length === 0) {
       await this.fetchInitialChats();
     }
@@ -35,7 +36,7 @@ export class ChatsController {
 
     if (!workspaces || workspaces.length === 0) {
       const clerkId = this.authModel?.user?.id || window.Clerk?.user?.id;
-      if (clerkId && this.dashboardModel) {
+      if (clerkId && this.dashboardModel && typeof this.dashboardModel.fetchUserWorkspaces === 'function') {
         try {
           const data = await this.dashboardModel.fetchUserWorkspaces(clerkId);
           workspaces = data.workspaces || data.profiles || [];
@@ -43,7 +44,21 @@ export class ChatsController {
       }
     }
 
-    this.view.populateWorkspaceFilterOptions(workspaces, this.model.currentWorkspaceId);
+    this.workspacesCache = Array.isArray(workspaces) ? workspaces : [];
+    this.view.populateWorkspaceFilterOptions(this.workspacesCache, this.model.currentWorkspaceId);
+    this.populateChannelOptions(this.model.currentWorkspaceId);
+  }
+
+  populateChannelOptions(workspaceId) {
+    if (workspaceId === 'all') {
+      // Show 'All Channels' when 'All Workspaces' is active
+      this.view.populateChannelFilterOptions([], 'all');
+      return;
+    }
+
+    const ws = this.workspacesCache.find(w => String(w.id) === String(workspaceId));
+    const channels = Array.isArray(ws?.channels) ? ws.channels : [];
+    this.view.populateChannelFilterOptions(channels, this.model.currentChannelId);
   }
 
   async fetchInitialChats() {
@@ -51,17 +66,25 @@ export class ChatsController {
     this.view.renderNoActiveChat();
 
     try {
-      await this.model.fetchChats({ workspaceId: this.model.currentWorkspaceId, reset: true });
+      await this.model.fetchChats({
+        workspaceId: 'all',
+        channelId: 'all',
+        reset: true
+      });
+
       const filtered = this.model.getFilteredChats();
 
       if (filtered.length === 0) {
-        this.view.renderThreadListEmpty("No conversations found for this workspace.");
+        this.view.renderThreadListEmpty("No conversations found.");
         this.view.renderNoActiveChat();
       } else {
         const firstChat = filtered[0];
         this.model.selectedChatId = firstChat.id;
         this.view.renderThreadCards(filtered, firstChat.id);
         this.view.renderActiveChat(firstChat);
+
+        // Fetch full message history for first chat if available
+        this._fetchAndRenderHistory(firstChat.id);
       }
     } catch (err) {
       console.error("ChatsController: Error fetching initial chats:", err);
@@ -77,20 +100,30 @@ export class ChatsController {
 
   async handleWorkspaceFilterChange(workspaceId) {
     this.model.currentWorkspaceId = workspaceId;
+    this.model.currentChannelId = 'all';
     this.model.offset = 0;
     this.model.hasMore = true;
+
+    // Dynamically update channel options based on chosen workspace
+    this.populateChannelOptions(workspaceId);
 
     const wsText = workspaceId === 'all' 
       ? 'All Workspaces' 
       : (this.view.getSelectedWorkspaceText() || `Workspace #${workspaceId}`);
-    const chText = this.view.getSelectedChannelText() || 'All Channels';
+    const chText = 'All Channels';
     this.view.updateScopeSummary(wsText, chText);
 
+    // Reset pagination & clear thread list
     this.view.renderThreadListLoading(true);
     this.view.renderNoActiveChat();
 
     try {
-      await this.model.fetchChats({ workspaceId, reset: true });
+      await this.model.fetchChats({
+        workspaceId,
+        channelId: 'all',
+        reset: true
+      });
+
       const filtered = this.model.getFilteredChats();
 
       if (filtered.length === 0) {
@@ -101,6 +134,7 @@ export class ChatsController {
         this.model.selectedChatId = firstChat.id;
         this.view.renderThreadCards(filtered, firstChat.id);
         this.view.renderActiveChat(firstChat);
+        this._fetchAndRenderHistory(firstChat.id);
       }
     } catch (err) {
       console.error("ChatsController: Error changing workspace filter:", err);
@@ -114,40 +148,70 @@ export class ChatsController {
     }
   }
 
-  handleChannelFilterChange(channel) {
-    this.model.currentChannelFilter = channel;
+  async handleChannelFilterChange(channelId) {
+    this.model.currentChannelId = channelId;
+    this.model.offset = 0;
+    this.model.hasMore = true;
+
     const wsText = this.view.getSelectedWorkspaceText() || 'All Workspaces';
-    const chText = channel === 'all' ? 'All Channels' : channel.toUpperCase();
+    const chText = this.view.getSelectedChannelText() || 'All Channels';
     this.view.updateScopeSummary(wsText, chText);
 
-    const filtered = this.model.getFilteredChats();
-    if (filtered.length === 0) {
-      this.view.renderThreadListEmpty(`No conversations for ${channel}.`);
-      this.view.renderNoActiveChat();
-    } else {
-      const activeChat = this.model.getSelectedChat();
-      this.view.renderThreadCards(filtered, activeChat?.id);
-      if (activeChat) this.view.renderActiveChat(activeChat);
+    // Reset pagination & clear thread list
+    this.view.renderThreadListLoading(true);
+    this.view.renderNoActiveChat();
+
+    try {
+      await this.model.fetchChats({
+        workspaceId: this.model.currentWorkspaceId,
+        channelId: this.model.currentChannelId,
+        reset: true
+      });
+
+      const filtered = this.model.getFilteredChats();
+
+      if (filtered.length === 0) {
+        this.view.renderThreadListEmpty(`No conversations found for ${chText}.`);
+        this.view.renderNoActiveChat();
+      } else {
+        const firstChat = filtered[0];
+        this.model.selectedChatId = firstChat.id;
+        this.view.renderThreadCards(filtered, firstChat.id);
+        this.view.renderActiveChat(firstChat);
+        this._fetchAndRenderHistory(firstChat.id);
+      }
+    } catch (err) {
+      console.error("ChatsController: Error changing channel filter:", err);
+      this.view.renderThreadListEmpty(err.serverMessage || err.message || "Failed to load chats.");
+    } finally {
+      if (!this.model.hasMore) {
+        this.view.hideScrollSentinel();
+      } else {
+        this.view.showScrollSentinel();
+      }
     }
   }
 
   handleSearch(query) {
     this.model.searchQuery = query;
     const filtered = this.model.getFilteredChats();
+
     if (filtered.length === 0) {
       this.view.renderThreadListEmpty("No matching conversations found.");
       this.view.renderNoActiveChat();
     } else {
       const activeChat = this.model.getSelectedChat();
       this.view.renderThreadCards(filtered, activeChat?.id);
-      if (activeChat) this.view.renderActiveChat(activeChat);
+      if (activeChat) {
+        this.view.renderActiveChat(activeChat);
+      }
     }
   }
 
   async handleInfiniteScroll() {
     if (this.model.isLoading || !this.model.hasMore) return;
 
-    // Increment offset by limit (10)
+    // Increment offset by limit (10) and fetch next page
     this.model.offset += this.model.limit;
     this.view.showScrollSentinel();
 
@@ -165,6 +229,20 @@ export class ChatsController {
     }
   }
 
+  async _fetchAndRenderHistory(chatId) {
+    const chat = this.model.getChatById(chatId);
+    if (!chat) return;
+
+    try {
+      const messages = await this.model.apiService.fetchChatMessages(chatId);
+      if (Array.isArray(messages) && messages.length > 0) {
+        this.view.renderChatMessages(chat, messages);
+      }
+    } catch (e) {
+      // Gracefully keeps default snippet view if full history endpoint is not available
+    }
+  }
+
   bindEvents() {
     // 1. Workspace dropdown filter change
     this.view.bindWorkspaceFilter((workspaceId) => {
@@ -172,8 +250,8 @@ export class ChatsController {
     });
 
     // 2. Channel dropdown filter change
-    this.view.bindChannelFilter((channel) => {
-      this.handleChannelFilterChange(channel);
+    this.view.bindChannelFilter((channelId) => {
+      this.handleChannelFilterChange(channelId);
     });
 
     // 3. Search input filtering
@@ -182,12 +260,13 @@ export class ChatsController {
     });
 
     // 4. Thread card selection delegation
-    this.view.bindThreadCardSelect((chatId) => {
+    this.view.bindThreadCardSelect(async (chatId) => {
       this.model.selectedChatId = chatId;
       const chat = this.model.getChatById(chatId);
       if (chat) {
         this.view.setActiveCard(chatId);
         this.view.renderActiveChat(chat);
+        await this._fetchAndRenderHistory(chatId);
       }
     });
 

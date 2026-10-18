@@ -4,11 +4,61 @@ export class ChatView {
     this.filterChannel = document.getElementById('filter-channel');
     this.scopeSummaryText = document.getElementById('scope-summary-text');
     this.chatSearchInput = document.getElementById('chat-search-input');
+    this.chatsSidebarPane = document.getElementById('chats-sidebar-pane');
     this.threadListContainer = document.getElementById('chats-thread-list');
     this.threadCardsContainer = document.getElementById('chats-thread-cards');
     this.scrollSentinel = document.getElementById('chats-scroll-sentinel');
     this.activeChatContainer = document.getElementById('active-chat-container');
     this.activeChatContext = document.getElementById('active-chat-context');
+    this.onMobileBackHandler = null;
+    this._mobileBackBound = false;
+  }
+
+  showMobileChatView() {
+    if (this.chatsSidebarPane) {
+      this.chatsSidebarPane.classList.add('hidden');
+      this.chatsSidebarPane.classList.remove('flex');
+    }
+    if (this.activeChatContainer) {
+      this.activeChatContainer.classList.remove('hidden');
+      this.activeChatContainer.classList.add('flex', 'w-full');
+    }
+  }
+
+  showMobileListView() {
+    if (this.chatsSidebarPane) {
+      this.chatsSidebarPane.classList.remove('hidden');
+      this.chatsSidebarPane.classList.add('flex', 'w-full');
+    }
+    if (this.activeChatContainer) {
+      this.activeChatContainer.classList.add('hidden');
+      this.activeChatContainer.classList.remove('flex', 'w-full');
+    }
+  }
+
+  resetResponsiveLayout() {
+    if (this.chatsSidebarPane) {
+      this.chatsSidebarPane.classList.remove('hidden', 'w-full');
+      this.chatsSidebarPane.classList.add('flex');
+    }
+    if (this.activeChatContainer) {
+      this.activeChatContainer.classList.remove('hidden', 'w-full');
+      this.activeChatContainer.classList.add('flex');
+    }
+  }
+
+  bindMobileBack(handler) {
+    this.onMobileBackHandler = handler;
+    if (this.activeChatContainer && !this._mobileBackBound) {
+      this._mobileBackBound = true;
+      this.activeChatContainer.addEventListener('click', (e) => {
+        const backBtn = e.target.closest('#chat-mobile-back-btn');
+        if (backBtn && this.onMobileBackHandler) {
+          e.preventDefault();
+          this.onMobileBackHandler();
+        }
+      });
+    }
   }
 
   _escape(str) {
@@ -432,8 +482,19 @@ export class ChatView {
     // PANE 2: Live Chat Timeline
     this.activeChatContainer.innerHTML = `
       <!-- Active Chat Header -->
-      <div class="h-14 border-b border-zinc-800 px-6 flex items-center justify-between shrink-0 bg-[#0d0d10]">
-        <div class="flex items-center gap-3 min-w-0">
+      <div class="h-14 border-b border-zinc-800 px-4 sm:px-6 flex items-center justify-between shrink-0 bg-[#0d0d10]">
+        <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <!-- Mobile Back Button (Only on mobile: md:hidden) -->
+          <button 
+            type="button" 
+            id="chat-mobile-back-btn" 
+            class="md:hidden text-zinc-400 hover:text-white p-2 -ml-1 sm:-ml-2 rounded-xl hover:bg-zinc-800 transition flex items-center justify-center cursor-pointer shrink-0" 
+            aria-label="Back to conversations list"
+            title="Back to conversations"
+          >
+            <i class="fa-solid fa-arrow-left text-sm"></i>
+          </button>
+
           <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 p-0.5 shrink-0">
             <div class="w-full h-full bg-[#111114] rounded-full flex items-center justify-center text-xs font-bold text-white">
               ${initials}

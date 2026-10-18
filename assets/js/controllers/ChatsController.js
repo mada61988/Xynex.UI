@@ -11,6 +11,7 @@ export class ChatsController {
     this.workspacesCache = [];
     this.currentChatOrders = [];
     this.observer = null;
+    this.isMobileChatOpen = false;
   }
 
   async init() {
@@ -18,6 +19,11 @@ export class ChatsController {
     if (!this.isInitialized) {
       this.bindEvents();
       this.isInitialized = true;
+    }
+
+    // Default to mobile list view if on smaller screens
+    if (window.innerWidth < 768) {
+      this.view.showMobileListView();
     }
 
     // 2. Populate workspace options in filter dropdown and initial channel options
@@ -81,7 +87,14 @@ export class ChatsController {
       } else {
         const firstChat = filtered[0];
         this.view.renderThreadCards(filtered, firstChat.id);
-        await this.selectChat(firstChat.id);
+        if (window.innerWidth >= 768) {
+          await this.selectChat(firstChat.id);
+        } else {
+          // Mobile default: Keep thread list open at 100% width
+          this.view.showMobileListView();
+          await this.selectChat(firstChat.id);
+          this.view.showMobileListView();
+        }
       }
     } catch (err) {
       console.error("ChatsController: Error fetching initial chats:", err);
@@ -295,10 +308,20 @@ export class ChatsController {
 
     // 4. Thread card selection delegation (clicking a chat calls GET /chats/:id)
     this.view.bindThreadCardSelect(async (chatId) => {
+      if (window.innerWidth < 768) {
+        this.isMobileChatOpen = true;
+        this.view.showMobileChatView();
+      }
       await this.selectChat(chatId);
     });
 
-    // 5. User order card click delegation to open details modal
+    // 5. Mobile back button delegation
+    this.view.bindMobileBack(() => {
+      this.isMobileChatOpen = false;
+      this.view.showMobileListView();
+    });
+
+    // 6. User order card click delegation to open details modal
     this.view.bindUserOrderClick((orderId) => {
       const order = this.currentChatOrders.find(o => String(o.id) === String(orderId));
       if (order) {
@@ -306,7 +329,20 @@ export class ChatsController {
       }
     });
 
-    // 6. Infinite Scroll Pagination (IntersectionObserver + Scroll fallback)
+    // 7. Responsive window resize listener
+    window.addEventListener('resize', () => {
+      if (window.innerWidth >= 768) {
+        this.view.resetResponsiveLayout();
+      } else {
+        if (this.isMobileChatOpen && this.model.selectedChatId) {
+          this.view.showMobileChatView();
+        } else {
+          this.view.showMobileListView();
+        }
+      }
+    });
+
+    // 8. Infinite Scroll Pagination (IntersectionObserver + Scroll fallback)
     this.setupInfiniteScroll();
   }
 

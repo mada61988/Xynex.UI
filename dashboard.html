@@ -499,10 +499,10 @@
         </header>
 
         <!-- 3-PANE CONVERSATION WORKSPACE -->
-        <div class="flex-1 flex overflow-hidden min-h-0">
+        <div class="flex-1 flex overflow-hidden min-h-0 relative">
 
-          <!-- PANE 1: THREAD LIST (Left) -->
-          <aside class="w-80 border-r border-[#27272a] bg-[#0d0d10] flex flex-col shrink-0">
+          <!-- PANE 1: THREAD LIST (Left - 100% on mobile, 320px on desktop) -->
+          <aside id="chats-sidebar-pane" class="w-full md:w-80 border-r border-[#27272a] bg-[#0d0d10] flex flex-col shrink-0 transition-all duration-200">
             <div class="p-3.5 border-b border-zinc-800">
               <div class="relative">
                 <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-zinc-500"></i>
@@ -525,8 +525,8 @@
             </div>
           </aside>
 
-          <!-- PANE 2: LIVE CHAT TIMELINE (Middle) -->
-          <main id="active-chat-container" class="flex-1 flex flex-col bg-[#111114] min-w-0">
+          <!-- PANE 2: LIVE CHAT TIMELINE (Middle - Hidden on mobile initially, 100% when active, flex-1 on desktop) -->
+          <main id="active-chat-container" class="hidden md:flex flex-1 flex-col bg-[#111114] min-w-0 w-full transition-all duration-200">
             <div class="flex-1 flex flex-col items-center justify-center p-8 text-center text-zinc-500">
               <i class="fa-solid fa-inbox text-3xl mb-3 text-zinc-700"></i>
               <p class="text-xs font-semibold text-zinc-400">Select a conversation</p>
@@ -534,7 +534,7 @@
             </div>
           </main>
 
-          <!-- PANE 3: CONTEXT & METADATA (Right) -->
+          <!-- PANE 3: CONTEXT & METADATA (Right - Hidden on mobile/tablet, visible on XL screens) -->
           <aside id="active-chat-context" class="w-72 border-l border-[#27272a] bg-[#0d0d10] p-5 shrink-0 space-y-6 overflow-y-auto no-scrollbar hidden xl:block">
             <div class="p-4 text-center text-zinc-600 text-xs">
               No conversation context selected

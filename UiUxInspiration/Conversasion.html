@@ -96,10 +96,10 @@
     </header>
 
     <!-- 3-PANE CONVERSATION WORKSPACE -->
-    <div class="flex-1 flex overflow-hidden">
+    <div class="flex-1 flex overflow-hidden relative">
 
-      <!-- PANE 1: THREAD LIST -->
-      <aside class="w-80 border-r border-[#27272a] bg-[#0d0d10] flex flex-col shrink-0">
+      <!-- PANE 1: THREAD LIST (100% on mobile, 320px on desktop) -->
+      <aside id="chats-sidebar-pane" class="w-full md:w-80 border-r border-[#27272a] bg-[#0d0d10] flex flex-col shrink-0 transition-all duration-200">
         <div class="p-3.5 border-b border-zinc-800">
           <div class="relative">
             <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-zinc-500"></i>
@@ -160,28 +160,39 @@
         </div>
       </aside>
 
-      <!-- PANE 2: LIVE CHAT TIMELINE -->
-      <main class="flex-1 flex flex-col bg-[#111114] min-w-0">
+      <!-- PANE 2: LIVE CHAT TIMELINE (Hidden on mobile initially, 100% when active, flex-1 on desktop) -->
+      <main id="active-chat-container" class="hidden md:flex flex-1 flex-col bg-[#111114] min-w-0 w-full transition-all duration-200">
         
         <!-- Active Chat Header -->
-        <div class="h-14 border-b border-zinc-800 px-6 flex items-center justify-between shrink-0 bg-[#0d0d10]">
-          <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 p-0.5">
+        <div class="h-14 border-b border-zinc-800 px-4 sm:px-6 flex items-center justify-between shrink-0 bg-[#0d0d10]">
+          <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <!-- Mobile Back Button (Only on mobile: md:hidden) -->
+            <button 
+              type="button" 
+              id="chat-mobile-back-btn" 
+              class="md:hidden text-zinc-400 hover:text-white p-2 -ml-2 rounded-xl hover:bg-zinc-800 transition flex items-center justify-center cursor-pointer shrink-0" 
+              aria-label="Back to conversations list"
+              title="Back to conversations"
+            >
+              <i class="fa-solid fa-arrow-left text-sm"></i>
+            </button>
+
+            <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 p-0.5 shrink-0">
               <div class="w-full h-full bg-[#111114] rounded-full flex items-center justify-center text-xs font-bold text-white">ED</div>
             </div>
-            <div>
-              <div class="text-xs font-bold text-white flex items-center gap-2">
-                <span>Elena Design (@elena_design)</span>
-                <span class="bg-pink-500/10 text-pink-400 border border-pink-500/20 text-[10px] px-1.5 py-0.2 rounded">Instagram</span>
+            <div class="min-w-0">
+              <div class="text-xs font-bold text-white flex items-center gap-2 truncate">
+                <span class="truncate">Elena Design (@elena_design)</span>
+                <span class="bg-pink-500/10 text-pink-400 border border-pink-500/20 text-[10px] px-1.5 py-0.2 rounded shrink-0">Instagram</span>
               </div>
-              <div class="text-[10px] text-zinc-500 font-mono">Channel ID: ch_instagram_90133 • Workspace: Stellar Fashion HQ</div>
+              <div class="text-[10px] text-zinc-500 font-mono truncate">Channel ID: ch_instagram_90133 • Workspace: Stellar Fashion HQ</div>
             </div>
           </div>
 
           <!-- Bot Pause Toggle -->
-          <button class="bg-zinc-900 border border-zinc-700 hover:border-rose-500/50 text-xs text-zinc-300 hover:text-white px-3 py-1.5 rounded-xl transition flex items-center gap-2">
+          <button class="bg-zinc-900 border border-zinc-700 hover:border-rose-500/50 text-xs text-zinc-300 hover:text-white px-3 py-1.5 rounded-xl transition flex items-center gap-2 shrink-0 cursor-pointer">
             <i class="fa-solid fa-hand text-rose-400"></i>
-            <span>Pause AI Agent</span>
+            <span class="hidden sm:inline">Pause AI Agent</span>
           </button>
         </div>
 

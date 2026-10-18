@@ -255,6 +255,16 @@ export class ChatModel {
     }
   }
 
+  async fetchOrderById(orderId) {
+    if (!orderId) return null;
+    try {
+      return await this.apiService.fetchOrderById(orderId);
+    } catch (err) {
+      console.warn(`ChatModel: Failed to fetch order #${orderId}:`, err);
+      return null;
+    }
+  }
+
   getSelectedChat() {
     if (this.selectedChatId) {
       const found = this.getChatById(this.selectedChatId);

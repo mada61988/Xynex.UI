@@ -322,10 +322,58 @@ export class ChatsController {
     });
 
     // 6. User order card click delegation to open details modal
-    this.view.bindUserOrderClick((orderId) => {
-      const order = this.currentChatOrders.find(o => String(o.id) === String(orderId));
+    this.view.bindUserOrderClick(async (orderId, isCart = false) => {
+      const activeChat = this.model.getSelectedChat();
+
+      // Check if it's the active cart
+      if (isCart || (activeChat && (String(activeChat.cart?.id) === String(orderId) || String(activeChat.cartId) === String(orderId)))) {
+        const cart = activeChat?.cart || {};
+        const items = Array.isArray(cart.items) ? cart.items : [];
+        const cartOrder = {
+          id: `${orderId}`,
+          status: 'ACTIVE CART',
+          createdAt: activeChat?.timestamp || new Date().toISOString(),
+          totalPrice: cart.totalPrice !== undefined ? cart.totalPrice : 0,
+          currency: cart.currencyCode || 'USD',
+          items: items.map(it => ({
+            productName: it.productName || it.title || it.name || 'Product',
+            productVariantId: it.productVariantId || it.variantId || it.variant_id || 'N/A',
+            sku: it.sku || 'N/A',
+            quantity: it.quantity || 1,
+            unitPrice: it.price || it.unitPrice || 0
+          })),
+          cartId: cart.id || orderId,
+          chatId: activeChat?.id,
+          workspaceId: activeChat?.workspaceId,
+          senderId: activeChat?.senderId,
+          shippingInfo: {
+            customerName: activeChat?.userName || activeChat?.title || 'Active Customer',
+            phoneNumber: 'N/A',
+            address: 'Active checkout in progress'
+          }
+        };
+        this.view.renderOrderDetailsModal(cartOrder);
+        return;
+      }
+
+      // Check from cached customer orders
+      let order = this.currentChatOrders.find(o => String(o.id) === String(orderId));
+      if (!order && activeChat?.orders) {
+        order = activeChat.orders.find(o => String(o.id) === String(orderId));
+      }
+
+      // If not in memory, try to fetch order details from API
+      if (!order) {
+        try {
+          const fetchedOrder = await this.model.fetchOrderById(orderId);
+          if (fetchedOrder) order = fetchedOrder;
+        } catch (_) {}
+      }
+
       if (order) {
         this.view.renderOrderDetailsModal(order);
+      } else {
+        console.warn(`ChatsController: Order #${orderId} could not be resolved.`);
       }
     });
 

@@ -644,6 +644,12 @@ export class ChatView {
             <span>${itemsCount} item(s)</span>
           </div>
           ${pendingHtml}
+          <div class="border-t border-zinc-800/80 pt-2.5 flex justify-end">
+            <button type="button" class="view-active-cart-btn text-[11px] text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 cursor-pointer" data-cart-id="${this._escape(cartId)}">
+              <span>Cart Details</span>
+              <i class="fa-solid fa-chevron-right text-[8px]"></i>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -933,7 +939,7 @@ export class ChatView {
     `;
 
     modalContainer.innerHTML = `
-      <div id="order-details-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+      <div id="order-details-modal" class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
         <div class="relative w-full max-w-2xl bg-[#111114] border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
           <!-- Modal Header -->
           <div class="px-6 py-4 border-b border-zinc-800 flex items-center justify-between bg-[#0d0d10]">
@@ -1070,14 +1076,34 @@ export class ChatView {
   }
 
   bindUserOrderClick(handler) {
+    const onOrderClick = (e) => {
+      const orderItem = e.target.closest('.user-order-item');
+      if (orderItem && orderItem.dataset.orderId) {
+        e.preventDefault();
+        e.stopPropagation();
+        handler(orderItem.dataset.orderId, false);
+        return;
+      }
+
+      const cartBtn = e.target.closest('.view-active-cart-btn');
+      if (cartBtn && cartBtn.dataset.cartId) {
+        e.preventDefault();
+        e.stopPropagation();
+        handler(cartBtn.dataset.cartId, true);
+        return;
+      }
+    };
+
     if (this.activeChatContext) {
-      this.activeChatContext.addEventListener('click', (e) => {
-        const item = e.target.closest('.user-order-item');
-        if (item && item.dataset.orderId) {
-          handler(item.dataset.orderId);
-        }
-      });
+      this.activeChatContext.addEventListener('click', onOrderClick);
     }
+    if (this.mobileContextDrawer) {
+      this.mobileContextDrawer.addEventListener('click', onOrderClick);
+    }
+    if (this.mobileContextContent) {
+      this.mobileContextContent.addEventListener('click', onOrderClick);
+    }
+    document.addEventListener('click', onOrderClick);
   }
 }
 

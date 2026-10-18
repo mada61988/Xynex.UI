@@ -10,8 +10,56 @@ export class ChatView {
     this.scrollSentinel = document.getElementById('chats-scroll-sentinel');
     this.activeChatContainer = document.getElementById('active-chat-container');
     this.activeChatContext = document.getElementById('active-chat-context');
+    this.mobileContextDrawer = document.getElementById('mobile-chat-context-drawer');
+    this.mobileContextBackdrop = document.getElementById('mobile-context-backdrop');
+    this.mobileContextContent = document.getElementById('mobile-chat-context-content');
     this.onMobileBackHandler = null;
     this._mobileBackBound = false;
+
+    this._bindMobileOrderDrawer();
+  }
+
+  _bindMobileOrderDrawer() {
+    if (this.activeChatContainer) {
+      this.activeChatContainer.addEventListener('click', (e) => {
+        const orderBtn = e.target.closest('#chat-mobile-order-btn') || e.target.closest('.view-active-order-link');
+        if (orderBtn) {
+          e.preventDefault();
+          this.showMobileOrderDrawer();
+        }
+      });
+    }
+
+    const closeBtn = document.getElementById('close-mobile-context-btn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        this.hideMobileOrderDrawer();
+      });
+    }
+
+    if (this.mobileContextBackdrop) {
+      this.mobileContextBackdrop.addEventListener('click', () => {
+        this.hideMobileOrderDrawer();
+      });
+    }
+  }
+
+  showMobileOrderDrawer() {
+    if (this.mobileContextDrawer) {
+      this.mobileContextDrawer.classList.remove('translate-x-full');
+    }
+    if (this.mobileContextBackdrop) {
+      this.mobileContextBackdrop.classList.remove('hidden');
+    }
+  }
+
+  hideMobileOrderDrawer() {
+    if (this.mobileContextDrawer) {
+      this.mobileContextDrawer.classList.add('translate-x-full');
+    }
+    if (this.mobileContextBackdrop) {
+      this.mobileContextBackdrop.classList.add('hidden');
+    }
   }
 
   showMobileChatView() {
@@ -509,15 +557,44 @@ export class ChatView {
           </div>
         </div>
 
-        <!-- Bot Pause Toggle -->
-        <button type="button" class="bg-zinc-900 border border-zinc-700 hover:border-rose-500/50 text-xs text-zinc-300 hover:text-white px-3 py-1.5 rounded-xl transition flex items-center gap-2 shrink-0 cursor-pointer">
-          <i class="fa-solid fa-hand text-rose-400"></i>
-          <span class="hidden sm:inline">Pause AI Agent</span>
-        </button>
+        <!-- Bot Pause & Mobile Order Toggle -->
+        <div class="flex items-center gap-2">
+          <!-- Mobile Order Info Toggle Button (xl:hidden) -->
+          <button 
+            type="button" 
+            id="chat-mobile-order-btn" 
+            class="xl:hidden bg-zinc-900 border border-zinc-700 hover:border-emerald-500/50 text-xs text-zinc-300 hover:text-white px-2.5 sm:px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 shrink-0 cursor-pointer"
+            title="View Active Order & Context"
+          >
+            <i class="fa-solid fa-cart-shopping text-emerald-400 text-xs"></i>
+            <span class="font-semibold text-white text-xs">Order</span>
+          </button>
+
+          <!-- Bot Pause Toggle -->
+          <button type="button" class="bg-zinc-900 border border-zinc-700 hover:border-rose-500/50 text-xs text-zinc-300 hover:text-white px-3 py-1.5 rounded-xl transition flex items-center gap-2 shrink-0 cursor-pointer">
+            <i class="fa-solid fa-hand text-rose-400"></i>
+            <span class="hidden sm:inline">Pause AI Agent</span>
+          </button>
+        </div>
       </div>
 
       <!-- Chat Stream -->
-      <div id="active-chat-stream" class="flex-1 overflow-y-auto p-6 space-y-4">
+      <div id="active-chat-stream" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+        <!-- Mobile In-Stream Active Order Pill -->
+        ${chat.cart || chat.cartId ? `
+          <div class="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between text-xs text-emerald-300 shadow-sm xl:hidden">
+            <div class="flex items-center gap-2.5 min-w-0 pr-2">
+              <div class="w-7 h-7 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                <i class="fa-solid fa-cart-shopping text-xs"></i>
+              </div>
+              <div class="truncate">
+                <div class="font-bold text-white truncate text-xs">Active Cart #${this._escape(chat.cart?.id || chat.cartId || 557)}</div>
+                <div class="text-[10px] text-zinc-400 font-mono">${Array.isArray(chat.cart?.items) ? chat.cart.items.length : 0} item(s) • ${this._escape(chat.cart?.currencyCode || 'USD')} ${this._escape(chat.cart?.totalPrice !== undefined ? Number(chat.cart.totalPrice).toFixed(2) : '0.00')}</div>
+              </div>
+            </div>
+            <button type="button" class="view-active-order-link px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 hover:text-white font-semibold text-[11px] shrink-0 transition cursor-pointer">Order Info &rarr;</button>
+          </div>
+        ` : ''}
         ${messagesHtml}
       </div>
 
@@ -531,93 +608,98 @@ export class ChatView {
     `;
 
     // PANE 3: Context & Metadata
-    if (this.activeChatContext) {
-      const cartObj = chat.cart;
-      const cartId = cartObj?.id || chat.cartId || 557;
-      const currency = cartObj?.currencyCode || 'USD';
-      const totalPrice = cartObj?.totalPrice !== undefined ? Number(cartObj.totalPrice).toFixed(2) : '0.00';
-      const itemsCount = Array.isArray(cartObj?.items) ? cartObj.items.length : 0;
+    const cartObj = chat.cart;
+    const cartId = cartObj?.id || chat.cartId || 557;
+    const currency = cartObj?.currencyCode || 'USD';
+    const totalPrice = cartObj?.totalPrice !== undefined ? Number(cartObj.totalPrice).toFixed(2) : '0.00';
+    const itemsCount = Array.isArray(cartObj?.items) ? cartObj.items.length : 0;
 
-      let pendingHtml = '';
-      if (chat.pendingSelections && chat.pendingSelections.productId) {
-        pendingHtml = `
-          <div class="border-t border-zinc-800/80 pt-2.5 mt-2.5 text-xs space-y-1">
-            <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
-              <i class="fa-solid fa-cart-arrow-down text-[9px]"></i> Pending Selection
-            </span>
-            <div class="text-zinc-300 font-mono text-[11px]">Product SKU #${this._escape(chat.pendingSelections.productId)}</div>
-          </div>
-        `;
-      }
-
-      this.activeChatContext.innerHTML = `
-        <!-- Active Order State -->
-        <div>
-          <h3 class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-3">Active Order State</h3>
-          <div class="bg-[#111114] border border-zinc-800 rounded-2xl p-4 space-y-3 shadow-sm">
-            <div class="flex justify-between items-center">
-              <span class="text-xs font-bold text-white">Cart #${this._escape(cartId)}</span>
-              <span class="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">ACTIVE</span>
-            </div>
-            <div class="border-t border-zinc-800/80 pt-2 flex justify-between text-xs">
-              <span class="text-zinc-400">Total Price</span>
-              <span class="font-mono text-white font-bold">${this._escape(currency)} ${this._escape(totalPrice)}</span>
-            </div>
-            <div class="flex justify-between text-[11px] text-zinc-500">
-              <span>Items in cart</span>
-              <span>${itemsCount} item(s)</span>
-            </div>
-            ${pendingHtml}
-          </div>
-        </div>
-
-        <!-- Orders Display (User Orders) -->
-        <div>
-          <div class="flex items-center justify-between mb-3">
-            <h3 class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Customer Orders</h3>
-            <span id="user-orders-count-badge" class="text-[10px] font-mono text-zinc-500 bg-zinc-800/80 border border-zinc-700/60 px-2 py-0.5 rounded-full">Syncing...</span>
-          </div>
-          <div id="user-orders-list-container" class="bg-[#111114] border border-zinc-800 rounded-2xl p-3 space-y-2 max-h-56 overflow-y-auto shadow-sm">
-            <div class="py-4 flex flex-col items-center justify-center text-zinc-500 text-xs gap-2">
-              <svg class="animate-spin h-4 w-4 text-blue-400" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <span class="text-[11px] font-mono text-zinc-500">Fetching customer orders...</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Channel Telemetry -->
-        <div>
-          <h3 class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-3">Channel Telemetry</h3>
-          <div class="bg-[#111114] border border-zinc-800 rounded-2xl p-4 space-y-2.5 text-xs shadow-sm">
-            <div class="flex justify-between">
-              <span class="text-zinc-400">Platform</span>
-              <span class="text-white font-medium capitalize flex items-center gap-1.5">
-                ${this.getPlatformIcon(chat.platform)}
-                ${platform}
-              </span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-zinc-400">Channel ID</span>
-              <span class="text-white font-mono">#${channelId}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-zinc-400">Sender ID</span>
-              <span class="text-zinc-400 font-mono truncate max-w-[120px]" title="${this._escape(chat.senderId || '')}">${this._escape(chat.senderId || 'N/A')}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-zinc-400">Latency</span>
-              <span class="text-emerald-400 font-mono font-semibold">0.78s</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-zinc-400">Webhook Status</span>
-              <span class="text-emerald-400 font-medium">200 OK</span>
-            </div>
-          </div>
+    let pendingHtml = '';
+    if (chat.pendingSelections && chat.pendingSelections.productId) {
+      pendingHtml = `
+        <div class="border-t border-zinc-800/80 pt-2.5 mt-2.5 text-xs space-y-1">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
+            <i class="fa-solid fa-cart-arrow-down text-[9px]"></i> Pending Selection
+          </span>
+          <div class="text-zinc-300 font-mono text-[11px]">Product SKU #${this._escape(chat.pendingSelections.productId)}</div>
         </div>
       `;
+    }
+
+    const contextHtml = `
+      <!-- Active Order State -->
+      <div>
+        <h3 class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-3">Active Order State</h3>
+        <div class="bg-[#111114] border border-zinc-800 rounded-2xl p-4 space-y-3 shadow-sm">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-bold text-white">Cart #${this._escape(cartId)}</span>
+            <span class="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">ACTIVE</span>
+          </div>
+          <div class="border-t border-zinc-800/80 pt-2 flex justify-between text-xs">
+            <span class="text-zinc-400">Total Price</span>
+            <span class="font-mono text-white font-bold">${this._escape(currency)} ${this._escape(totalPrice)}</span>
+          </div>
+          <div class="flex justify-between text-[11px] text-zinc-500">
+            <span>Items in cart</span>
+            <span>${itemsCount} item(s)</span>
+          </div>
+          ${pendingHtml}
+        </div>
+      </div>
+
+      <!-- Orders Display (User Orders) -->
+      <div>
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Customer Orders</h3>
+          <span id="user-orders-count-badge" class="text-[10px] font-mono text-zinc-500 bg-zinc-800/80 border border-zinc-700/60 px-2 py-0.5 rounded-full">Syncing...</span>
+        </div>
+        <div id="user-orders-list-container" class="bg-[#111114] border border-zinc-800 rounded-2xl p-3 space-y-2 max-h-56 overflow-y-auto shadow-sm">
+          <div class="py-4 flex flex-col items-center justify-center text-zinc-500 text-xs gap-2">
+            <svg class="animate-spin h-4 w-4 text-blue-400" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="text-[11px] font-mono text-zinc-500">Fetching customer orders...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Channel Telemetry -->
+      <div>
+        <h3 class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-3">Channel Telemetry</h3>
+        <div class="bg-[#111114] border border-zinc-800 rounded-2xl p-4 space-y-2.5 text-xs shadow-sm">
+          <div class="flex justify-between">
+            <span class="text-zinc-400">Platform</span>
+            <span class="text-white font-medium capitalize flex items-center gap-1.5">
+              ${this.getPlatformIcon(chat.platform)}
+              ${platform}
+            </span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-zinc-400">Channel ID</span>
+            <span class="text-white font-mono">#${channelId}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-zinc-400">Sender ID</span>
+            <span class="text-zinc-400 font-mono truncate max-w-[120px]" title="${this._escape(chat.senderId || '')}">${this._escape(chat.senderId || 'N/A')}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-zinc-400">Latency</span>
+            <span class="text-emerald-400 font-mono font-semibold">0.78s</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-zinc-400">Webhook Status</span>
+            <span class="text-emerald-400 font-medium">200 OK</span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    if (this.activeChatContext) {
+      this.activeChatContext.innerHTML = contextHtml;
+    }
+    if (this.mobileContextContent) {
+      this.mobileContextContent.innerHTML = contextHtml;
     }
   }
 
@@ -649,12 +731,16 @@ export class ChatView {
         </div>
       `;
     }
+    const noContextHtml = `
+      <div class="p-4 text-center text-zinc-600 text-xs">
+        No conversation context selected
+      </div>
+    `;
     if (this.activeChatContext) {
-      this.activeChatContext.innerHTML = `
-        <div class="p-4 text-center text-zinc-600 text-xs">
-          No conversation context selected
-        </div>
-      `;
+      this.activeChatContext.innerHTML = noContextHtml;
+    }
+    if (this.mobileContextContent) {
+      this.mobileContextContent.innerHTML = noContextHtml;
     }
   }
 
@@ -741,27 +827,36 @@ export class ChatView {
   }
 
   renderUserOrders(orders) {
-    const container = document.getElementById('user-orders-list-container');
-    const badge = document.getElementById('user-orders-count-badge');
+    const containers = [
+      document.querySelector('#active-chat-context #user-orders-list-container'),
+      document.querySelector('#mobile-chat-context-content #user-orders-list-container')
+    ].filter(Boolean);
+
+    const badges = [
+      document.querySelector('#active-chat-context #user-orders-count-badge'),
+      document.querySelector('#mobile-chat-context-content #user-orders-count-badge')
+    ].filter(Boolean);
+
     const list = Array.isArray(orders) ? orders : [];
 
-    if (badge) {
+    badges.forEach(badge => {
       badge.textContent = `${list.length} order${list.length === 1 ? '' : 's'}`;
-    }
+    });
 
-    if (!container) return;
+    if (containers.length === 0) return;
 
     if (list.length === 0) {
-      container.innerHTML = `
+      const emptyHtml = `
         <div class="py-4 text-center text-zinc-500 text-xs flex flex-col items-center justify-center gap-1.5">
           <i class="fa-solid fa-box-open text-zinc-600 text-lg"></i>
           <span>No previous orders found</span>
         </div>
       `;
+      containers.forEach(c => c.innerHTML = emptyHtml);
       return;
     }
 
-    container.innerHTML = list.map(order => {
+    const ordersHtml = list.map(order => {
       const status = String(order.status || 'CONFIRMED').toUpperCase();
       let statusBadge = 'bg-zinc-800 text-zinc-400 border-zinc-700';
       if (status === 'CONFIRMED') statusBadge = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
@@ -794,6 +889,8 @@ export class ChatView {
         </div>
       `;
     }).join('');
+
+    containers.forEach(c => c.innerHTML = ordersHtml);
   }
 
   renderOrderDetailsModal(order) {

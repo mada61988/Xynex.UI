@@ -459,40 +459,46 @@
       </section>
 
       <!-- SECTION: CONVERSATIONS (OMNICHANNEL INBOX) -->
-      <section id="section-conversations" class="hidden -m-6 md:-m-8 h-[calc(100vh-4.5rem)] flex flex-col min-w-0 bg-[#09090b] overflow-hidden">
+      <section id="section-conversations" class="hidden -m-6 md:-m-8 h-[calc(100vh-4.5rem)] flex flex-col min-w-0 bg-[#09090b] overflow-hidden relative">
         
-        <!-- TOP SCOPE FILTER BAR -->
-        <header class="h-14 border-b border-[#27272a] bg-[#111114] px-6 flex items-center justify-between shrink-0">
-          <div class="flex items-center gap-4">
-            <h1 class="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2">
+        <!-- TOP SCOPE FILTER BAR (Responsive on Mobile) -->
+        <header class="border-b border-[#27272a] bg-[#111114] px-4 sm:px-6 py-2.5 sm:py-0 sm:h-14 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
+          <div class="flex items-center justify-between sm:justify-start gap-3 sm:gap-4 w-full sm:w-auto">
+            <h1 class="text-xs sm:text-base font-bold text-white tracking-tight flex items-center gap-2">
               <i class="fa-solid fa-inbox text-zinc-400 text-sm"></i>
               <span>Omnichannel Inbox</span>
             </h1>
 
-            <div class="h-4 w-px bg-zinc-800"></div>
+            <div class="h-4 w-px bg-zinc-800 hidden sm:block"></div>
 
-            <!-- Scope Controls: Workspace & Channel Pickers -->
-            <div class="flex items-center gap-2">
-              <!-- 1. Workspace Selector -->
-              <div class="flex items-center gap-1.5 bg-[#0d0d10] border border-zinc-800 rounded-xl px-3 py-1.5 text-xs">
-                <span class="text-zinc-500 font-medium">Workspace:</span>
-                <select id="filter-workspace" class="bg-transparent text-white font-semibold focus:outline-none cursor-pointer">
-                  <option value="all" class="bg-[#111114] text-white">All Workspaces</option>
-                </select>
-              </div>
-
-              <!-- 2. Channel Selector -->
-              <div class="flex items-center gap-1.5 bg-[#0d0d10] border border-zinc-800 rounded-xl px-3 py-1.5 text-xs">
-                <span class="text-zinc-500 font-medium">Channel:</span>
-                <select id="filter-channel" class="bg-transparent text-white font-semibold focus:outline-none cursor-pointer">
-                  <option value="all" class="bg-[#111114] text-white">All Channels</option>
-                </select>
-              </div>
+            <!-- Scope Indicator Pill (Mobile Compact) -->
+            <div class="text-[11px] text-zinc-400 flex sm:hidden items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span class="font-mono text-[10px] text-zinc-300">Live</span>
             </div>
           </div>
 
-          <!-- Scope Indicator Pill -->
-          <div class="text-xs text-zinc-400 hidden sm:flex items-center gap-2">
+          <!-- Scope Controls: Workspace & Channel Pickers (Fully visible and responsive on mobile) -->
+          <div class="flex items-center gap-2 w-full sm:w-auto overflow-x-auto no-scrollbar pb-0.5 sm:pb-0">
+            <!-- 1. Workspace Selector -->
+            <div class="flex-1 sm:flex-initial flex items-center gap-1.5 bg-[#0d0d10] border border-zinc-800 rounded-xl px-2.5 sm:px-3 py-1.5 text-xs min-w-0">
+              <span class="text-zinc-500 font-medium text-[10px] sm:text-xs shrink-0">Workspace:</span>
+              <select id="filter-workspace" class="bg-transparent text-white font-semibold focus:outline-none cursor-pointer text-xs truncate w-full sm:w-auto sm:max-w-[160px]">
+                <option value="all" class="bg-[#111114] text-white">All Workspaces</option>
+              </select>
+            </div>
+
+            <!-- 2. Channel Selector -->
+            <div class="flex-1 sm:flex-initial flex items-center gap-1.5 bg-[#0d0d10] border border-zinc-800 rounded-xl px-2.5 sm:px-3 py-1.5 text-xs min-w-0">
+              <span class="text-zinc-500 font-medium text-[10px] sm:text-xs shrink-0">Channel:</span>
+              <select id="filter-channel" class="bg-transparent text-white font-semibold focus:outline-none cursor-pointer text-xs truncate w-full sm:w-auto sm:max-w-[160px]">
+                <option value="all" class="bg-[#111114] text-white">All Channels</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Scope Indicator Pill (Desktop) -->
+          <div class="text-xs text-zinc-400 hidden sm:flex items-center gap-2 shrink-0">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             <span id="scope-summary-text" class="font-mono text-[11px] text-zinc-300">Showing: All Workspaces / All Channels</span>
           </div>
@@ -542,6 +548,35 @@
           </aside>
 
         </div>
+
+        <!-- MOBILE CONTEXT & ACTIVE ORDER DRAWER (Slide-over on mobile/tablet) -->
+        <div id="mobile-chat-context-drawer" class="fixed inset-y-0 right-0 w-full sm:w-96 bg-[#0d0d10] border-l border-zinc-800 z-50 transform translate-x-full transition-transform duration-300 flex flex-col xl:hidden shadow-2xl">
+          <!-- Drawer Header -->
+          <div class="h-14 border-b border-zinc-800 px-5 flex items-center justify-between shrink-0 bg-[#111114]">
+            <div class="flex items-center gap-2">
+              <i class="fa-solid fa-cart-shopping text-emerald-400 text-sm"></i>
+              <span class="text-sm font-bold text-white tracking-tight">Active Order & Context</span>
+            </div>
+            <button 
+              type="button" 
+              id="close-mobile-context-btn" 
+              class="text-zinc-400 hover:text-white p-2 rounded-xl hover:bg-zinc-800 transition cursor-pointer" 
+              aria-label="Close Order Context"
+            >
+              <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+          </div>
+
+          <!-- Drawer Content Container (Synchronized with desktop context) -->
+          <div id="mobile-chat-context-content" class="flex-1 overflow-y-auto p-5 space-y-6 no-scrollbar">
+            <div class="p-4 text-center text-zinc-600 text-xs">
+              No conversation context selected
+            </div>
+          </div>
+        </div>
+
+        <!-- Mobile Context Drawer Backdrop -->
+        <div id="mobile-context-backdrop" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden xl:hidden transition-opacity"></div>
       </section>
 
       <!-- SECTION: WORKSPACES -->

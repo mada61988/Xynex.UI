@@ -118,6 +118,14 @@
           <!-- <span class="text-xs bg-zinc-800 px-2 py-0.5 rounded-full text-zinc-400 font-medium border border-zinc-700">Explore</span> -->
         </a>
 
+        <a href="#products" class="sidebar-link flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-transparent text-sm font-medium text-zinc-400 hover:text-white">
+          <div class="flex items-center gap-3">
+            <i class="fa-solid fa-boxes-stacked w-4 text-zinc-400"></i>
+            <span>Products</span>
+          </div>
+          <span class="text-[10px] font-bold bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded-full border border-zinc-700">Catalog</span>
+        </a>
+
         <a href="#integrations" class="sidebar-link flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-transparent text-sm font-medium text-zinc-400 hover:text-white">
           <div class="flex items-center gap-3">
             <i class="fa-solid fa-plug-circle-bolt w-4 text-zinc-400"></i>
@@ -939,6 +947,41 @@
             </div>
           </form>
         </div>
+      </section>
+
+      <!-- SECTION: PRODUCTS -->
+      <section id="section-products" class="space-y-8 hidden">
+        <!-- Products Header & Workspace Selector -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white flex items-center gap-3">
+              <i class="fa-solid fa-boxes-stacked text-white text-2xl"></i>
+              <span>Products Catalog</span>
+            </h1>
+            <p class="text-xs sm:text-sm text-zinc-400 mt-1">
+              Browse, view details, and manage inventory across your workspace storefronts.
+            </p>
+          </div>
+
+          <!-- Workspace Selector in Products tab -->
+          <div class="flex items-center gap-2.5 bg-[#111114] border border-zinc-800 px-4 py-2.5 rounded-2xl shadow-sm self-start sm:self-auto">
+            <span class="text-xs uppercase font-bold text-zinc-400 tracking-wider flex items-center gap-1.5 shrink-0">
+              <i class="fa-solid fa-briefcase text-zinc-400 text-xs"></i>
+              <span>Workspace:</span>
+            </span>
+            <div class="relative">
+              <select 
+                id="products-workspace-select" 
+                class="bg-transparent text-white text-xs sm:text-sm font-semibold focus:outline-none cursor-pointer pr-4"
+              >
+                <!-- Populated dynamically with user's workspaces -->
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Products Grid Container -->
+        <div id="products-grid-container" class="min-h-[300px]"></div>
       </section>
 
     </main>

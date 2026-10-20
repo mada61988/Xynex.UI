@@ -52,6 +52,11 @@ export class DashboardView {
     // Conversations Section
     this.conversationsSection = document.getElementById('section-conversations');
 
+    // Products Section
+    this.productsSection = document.getElementById('section-products');
+    this.productsGridContainer = document.getElementById('products-grid-container');
+    this.productsWorkspaceSelect = document.getElementById('products-workspace-select');
+
     // Callbacks for role editing
     this.onEditRoleClick = null;
     this.onSaveRoleClick = null;
@@ -562,6 +567,7 @@ export class DashboardView {
     if (this.createWorkspaceSection) this.createWorkspaceSection.classList.add('hidden');
     if (this.createChannelSection) this.createChannelSection.classList.add('hidden');
     if (this.conversationsSection) this.conversationsSection.classList.add('hidden');
+    if (this.productsSection) this.productsSection.classList.add('hidden');
 
     const isOverview = (sectionName === 'overview' || !sectionName || sectionName === '');
 
@@ -569,6 +575,11 @@ export class DashboardView {
       if (this.usersSection) this.usersSection.classList.remove('hidden');
       this.renderHeaderBreadcrumbs([
         { label: 'Users Directory', icon: '<i class="fa-solid fa-user text-xs text-zinc-400"></i>' }
+      ]);
+    } else if (sectionName === 'products') {
+      if (this.productsSection) this.productsSection.classList.remove('hidden');
+      this.renderHeaderBreadcrumbs([
+        { label: 'Products Catalog', icon: '<i class="fa-solid fa-boxes-stacked text-xs text-zinc-400"></i>' }
       ]);
     } else if (sectionName === 'conversations' || sectionName === 'chats') {
       if (this.conversationsSection) this.conversationsSection.classList.remove('hidden');
@@ -3112,6 +3123,460 @@ export class DashboardView {
     const retryBtn = document.getElementById('retry-workspaces-btn');
     if (retryBtn && onRetry) {
       retryBtn.addEventListener('click', () => onRetry());
+    }
+  }
+
+  renderProductsWorkspaceOptions(workspaces, selectedWorkspaceId) {
+    if (!this.productsWorkspaceSelect) return;
+    if (!workspaces || workspaces.length === 0) {
+      this.productsWorkspaceSelect.innerHTML = `<option value="" disabled selected>No workspaces found</option>`;
+      return;
+    }
+    this.productsWorkspaceSelect.innerHTML = workspaces.map(w => {
+      const isSelected = String(w.id) === String(selectedWorkspaceId);
+      return `<option value="${w.id}" class="bg-[#111114] text-white" ${isSelected ? 'selected' : ''}>${this._escape(w.name || `Workspace #${w.id}`)}</option>`;
+    }).join('');
+  }
+
+  bindProductsWorkspaceChange(handler) {
+    if (this.productsWorkspaceSelect) {
+      this.productsWorkspaceSelect.onchange = (e) => {
+        handler(e.target.value);
+      };
+    }
+  }
+
+  renderProductsLoading() {
+    if (!this.productsGridContainer) return;
+    this.productsGridContainer.innerHTML = `
+      <div class="bento-card rounded-3xl p-16 flex flex-col items-center justify-center gap-4 text-center">
+        <svg class="animate-spin h-8 w-8 text-white" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <div class="text-sm font-semibold text-zinc-300">Loading products catalog...</div>
+        <div class="text-xs text-zinc-500">Querying workspace inventory and variants</div>
+      </div>
+    `;
+  }
+
+  renderProductsError(errorMessage, onRetry = null) {
+    if (!this.productsGridContainer) return;
+    this.productsGridContainer.innerHTML = `
+      <div class="bento-card rounded-3xl p-10 flex flex-col items-center justify-center text-center border border-rose-500/20">
+        <div class="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-4 shadow-xl">
+          <i class="fa-solid fa-triangle-exclamation text-2xl"></i>
+        </div>
+        <h3 class="text-lg font-bold text-white mb-1">Failed to Load Products</h3>
+        <p class="text-xs text-zinc-400 max-w-md mb-6">${this._escape(errorMessage || 'Server error occurred while fetching products.')}</p>
+        ${onRetry ? `
+          <button type="button" id="retry-fetch-products-btn" class="bg-white hover:bg-zinc-200 text-black px-5 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer">
+            <i class="fa-solid fa-rotate-right mr-1.5"></i> Try Again
+          </button>
+        ` : ''}
+      </div>
+    `;
+    if (onRetry) {
+      const retryBtn = document.getElementById('retry-fetch-products-btn');
+      if (retryBtn) retryBtn.onclick = () => onRetry();
+    }
+  }
+
+  renderProductsGrid(products, onProductClick) {
+    if (!this.productsGridContainer) return;
+
+    if (!products || products.length === 0) {
+      this.productsGridContainer.innerHTML = `
+        <div class="bento-card rounded-3xl p-16 text-center flex flex-col items-center justify-center gap-3 text-zinc-400">
+          <div class="w-14 h-14 rounded-2xl bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-zinc-500 text-2xl">
+            <i class="fa-solid fa-box-open"></i>
+          </div>
+          <div class="text-base font-bold text-white">No products found</div>
+          <p class="text-xs text-zinc-500 max-w-sm">This workspace does not have any product catalog items registered yet.</p>
+        </div>
+      `;
+      return;
+    }
+
+    const cardsHtml = products.map(p => {
+      const priceFormatted = `$${Number(p.price || 0).toFixed(2)}`;
+      const variantsCount = Array.isArray(p.productVariants) ? p.productVariants.length : 0;
+      const attributesText = Array.isArray(p.attributes) ? p.attributes.join(', ') : '';
+
+      let imageHtml;
+      if (p.imageUrl) {
+        imageHtml = `
+          <img 
+            src="${this._escape(p.imageUrl)}" 
+            alt="${this._escape(p.name)}" 
+            class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+            loading="lazy"
+            onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\\'w-full h-full flex flex-col items-center justify-center text-zinc-600 gap-1 bg-zinc-900/80\\'><i class=\\'fa-solid fa-box text-3xl text-zinc-700\\'></i><span class=\\'text-[10px] text-zinc-500\\'>No image</span></div>';"
+          />
+        `;
+      } else {
+        imageHtml = `
+          <div class="w-full h-full flex flex-col items-center justify-center text-zinc-600 gap-1 bg-zinc-900/60">
+            <i class="fa-solid fa-box text-3xl text-zinc-700"></i>
+            <span class="text-[10px] text-zinc-500 font-medium">No Image</span>
+          </div>
+        `;
+      }
+
+      return `
+        <div 
+          class="product-box bento-card rounded-2xl p-4 cursor-pointer hover:border-zinc-500/60 transition duration-300 transform hover:-translate-y-1 hover:shadow-2xl flex flex-col justify-between group relative"
+          data-product-id="${p.id}"
+        >
+          <div>
+            <!-- Product Image Box -->
+            <div class="relative w-full h-44 rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 mb-3 flex items-center justify-center">
+              ${imageHtml}
+              <span class="absolute top-2.5 right-2.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm ${p.isActive !== false ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 backdrop-blur-md' : 'bg-zinc-800/90 text-zinc-400 border border-zinc-700'}">
+                ${p.isActive !== false ? 'Active' : 'Draft'}
+              </span>
+            </div>
+
+            <!-- Product Name -->
+            <h3 class="text-sm font-bold text-white group-hover:text-zinc-200 transition truncate" title="${this._escape(p.name)}">
+              ${this._escape(p.name)}
+            </h3>
+
+            <!-- Description snippet -->
+            <p class="text-xs text-zinc-400 line-clamp-2 mt-1 leading-relaxed">
+              ${this._escape(p.description || 'No description provided')}
+            </p>
+
+            <!-- Meta tag / Variants info -->
+            <div class="mt-2.5 flex items-center gap-1.5 flex-wrap">
+              <span class="text-[10px] font-semibold text-zinc-400 bg-zinc-800/80 px-2 py-0.5 rounded-md border border-zinc-700/60">
+                ${variantsCount} ${variantsCount === 1 ? 'Variant' : 'Variants'}
+              </span>
+              ${attributesText ? `<span class="text-[10px] text-zinc-500 truncate max-w-[140px]">${this._escape(attributesText)}</span>` : ''}
+            </div>
+          </div>
+
+          <!-- Price & Action CTA -->
+          <div class="mt-4 pt-3 border-t border-zinc-800/80 flex items-center justify-between">
+            <div>
+              <span class="text-[10px] uppercase font-bold text-zinc-500">Price</span>
+              <div class="text-base font-extrabold text-white leading-tight">
+                ${priceFormatted}
+              </div>
+            </div>
+            <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-400 group-hover:text-white transition">
+              <span>Details</span>
+              <i class="fa-solid fa-arrow-right text-[10px] transition-transform group-hover:translate-x-0.5"></i>
+            </span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    this.productsGridContainer.innerHTML = `
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        ${cardsHtml}
+      </div>
+    `;
+
+    // Bind click events on product boxes
+    this.productsGridContainer.querySelectorAll('.product-box').forEach(card => {
+      card.onclick = () => {
+        const pid = Number(card.dataset.productId);
+        const product = products.find(p => p.id === pid);
+        if (product && onProductClick) {
+          onProductClick(product);
+        }
+      };
+    });
+  }
+
+  openProductDetailsModal(product, { onEdit, onSave }) {
+    if (!this.modalContainer) {
+      this.modalContainer = document.getElementById('modal-container');
+    }
+    if (!this.modalContainer) return;
+
+    const variants = Array.isArray(product.productVariants) ? product.productVariants : [];
+    const attributesList = Array.isArray(product.attributes) ? product.attributes : [];
+
+    let imageHtml;
+    if (product.imageUrl) {
+      imageHtml = `
+        <img 
+          src="${this._escape(product.imageUrl)}" 
+          alt="${this._escape(product.name)}" 
+          class="w-full h-56 sm:h-64 object-cover rounded-2xl bg-zinc-900 border border-zinc-800" 
+          onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\\'w-full h-56 sm:h-64 rounded-2xl bg-zinc-900 border border-zinc-800 flex flex-col items-center justify-center text-zinc-600 gap-2\\'><i class=\\'fa-solid fa-box text-4xl\\'></i><span class=\\'text-xs\\'>No image</span></div>';"
+        />
+      `;
+    } else {
+      imageHtml = `
+        <div class="w-full h-56 sm:h-64 rounded-2xl bg-zinc-900 border border-zinc-800 flex flex-col items-center justify-center text-zinc-600 gap-2">
+          <i class="fa-solid fa-box text-4xl text-zinc-700"></i>
+          <span class="text-xs text-zinc-500 font-medium">No Image Available</span>
+        </div>
+      `;
+    }
+
+    const variantsRows = variants.map(v => {
+      let attrDisplay = '—';
+      if (v.attributes && typeof v.attributes === 'object') {
+        attrDisplay = Object.entries(v.attributes).map(([k, val]) => `<span class="text-white font-medium">${this._escape(k)}:</span> ${this._escape(val)}`).join(' · ');
+      }
+      return `
+        <tr class="hover:bg-zinc-800/40 transition">
+          <td class="py-3 px-3 text-xs font-mono font-bold text-white">${this._escape(v.sku || 'N/A')}</td>
+          <td class="py-3 px-3 text-xs text-zinc-300">${attrDisplay}</td>
+          <td class="py-3 px-3 text-xs font-mono font-semibold text-white">$${Number(v.price || 0).toFixed(2)}</td>
+          <td class="py-3 px-3 text-right">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${v.stock > 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}">
+              ${v.stock} in stock
+            </span>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    this.modalContainer.innerHTML = `
+      <div id="product-modal-backdrop" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+        <div class="bento-card w-full max-w-2xl rounded-3xl p-6 sm:p-8 relative border border-zinc-700/80 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
+          
+          <!-- Close Button -->
+          <button type="button" id="close-product-modal-btn" class="absolute top-5 right-5 text-zinc-400 hover:text-white p-2 rounded-xl hover:bg-zinc-800 transition cursor-pointer" aria-label="Close modal">
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+
+          <!-- VIEW MODE -->
+          <div id="product-modal-view-mode" class="space-y-6">
+            <div class="flex flex-col sm:flex-row gap-6 items-start">
+              <div class="w-full sm:w-1/2 shrink-0">
+                ${imageHtml}
+              </div>
+              <div class="w-full sm:w-1/2 flex flex-col justify-between h-full space-y-4">
+                <div>
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${product.isActive !== false ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-zinc-800 text-zinc-400 border border-zinc-700'}">
+                      ${product.isActive !== false ? 'Active' : 'Draft'}
+                    </span>
+                    <span class="text-zinc-500 text-xs font-mono">ID #${product.id}</span>
+                  </div>
+                  <h2 class="text-xl sm:text-2xl font-extrabold text-white leading-tight">${this._escape(product.name)}</h2>
+                  <div class="text-2xl font-extrabold text-white mt-2">$${Number(product.price || 0).toFixed(2)}</div>
+                </div>
+
+                <p class="text-xs sm:text-sm text-zinc-400 leading-relaxed">${this._escape(product.description || 'No description provided.')}</p>
+
+                ${attributesList.length > 0 ? `
+                  <div class="pt-2 border-t border-zinc-800">
+                    <span class="text-[10px] font-bold uppercase text-zinc-500 tracking-wider">Attributes:</span>
+                    <div class="flex gap-1.5 flex-wrap mt-1">
+                      ${attributesList.map(a => `<span class="text-xs font-medium bg-zinc-800/80 text-zinc-300 border border-zinc-700 px-2 py-0.5 rounded-md">${this._escape(a)}</span>`).join('')}
+                    </div>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+
+            <!-- Variants Table -->
+            <div class="pt-4 border-t border-zinc-800">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-400">Product Variants (${variants.length})</h3>
+                <span class="text-[11px] text-zinc-500">Live inventory status</span>
+              </div>
+              
+              ${variants.length > 0 ? `
+                <div class="overflow-x-auto no-scrollbar border border-zinc-800/80 rounded-2xl bg-[#0d0d10]/60">
+                  <table class="w-full text-left border-collapse">
+                    <thead>
+                      <tr class="border-b border-zinc-800 text-[10px] font-bold uppercase text-zinc-500 tracking-wider">
+                        <th class="py-2.5 px-3">SKU</th>
+                        <th class="py-2.5 px-3">Attributes</th>
+                        <th class="py-2.5 px-3">Price</th>
+                        <th class="py-2.5 px-3 text-right">Stock</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-800/60">
+                      ${variantsRows}
+                    </tbody>
+                  </table>
+                </div>
+              ` : `
+                <div class="p-4 rounded-xl bg-zinc-900/40 text-center text-xs text-zinc-500">No variants registered for this product.</div>
+              `}
+            </div>
+
+            <!-- Footer Actions -->
+            <div class="pt-4 border-t border-zinc-800 flex items-center justify-between">
+              <span class="text-[11px] text-zinc-500">Workspace #${product.workspaceId}</span>
+              <div class="flex items-center gap-3">
+                <button type="button" id="start-edit-product-btn" class="bg-white hover:bg-zinc-200 text-black px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-md">
+                  <i class="fa-solid fa-pen-to-square text-xs"></i>
+                  <span>Edit Product</span>
+                </button>
+                <button type="button" id="cancel-product-modal-btn" class="border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer">
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- EDIT FORM MODE -->
+          <div id="product-modal-edit-mode" class="hidden space-y-5">
+            <div class="pb-3 border-b border-zinc-800">
+              <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-pen-to-square text-zinc-400"></i>
+                <span>Edit Product Details</span>
+              </h2>
+              <p class="text-xs text-zinc-400 mt-0.5">Modify information for SKU catalog sync.</p>
+            </div>
+
+            <form id="product-edit-form" class="space-y-4">
+              <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">Product Name</label>
+                <input 
+                  type="text" 
+                  id="edit-product-name" 
+                  value="${this._escape(product.name)}" 
+                  required 
+                  class="w-full bg-[#0d0d10] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                />
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">Price ($)</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    id="edit-product-price" 
+                    value="${product.price || 0}" 
+                    required 
+                    class="w-full bg-[#0d0d10] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">Status</label>
+                  <select 
+                    id="edit-product-status" 
+                    class="w-full bg-[#0d0d10] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-zinc-500"
+                  >
+                    <option value="true" ${product.isActive !== false ? 'selected' : ''}>Active</option>
+                    <option value="false" ${product.isActive === false ? 'selected' : ''}>Draft / Inactive</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">Image URL</label>
+                <input 
+                  type="url" 
+                  id="edit-product-image" 
+                  value="${this._escape(product.imageUrl || '')}" 
+                  placeholder="https://..." 
+                  class="w-full bg-[#0d0d10] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-zinc-500"
+                />
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">Description</label>
+                <textarea 
+                  id="edit-product-description" 
+                  rows="3" 
+                  class="w-full bg-[#0d0d10] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-zinc-500"
+                >${this._escape(product.description || '')}</textarea>
+              </div>
+
+              <div id="product-edit-feedback" class="hidden text-xs py-2 px-3 rounded-lg"></div>
+
+              <div class="pt-4 border-t border-zinc-800 flex items-center justify-end gap-3">
+                <button type="button" id="cancel-edit-mode-btn" class="border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 px-4 py-2.5 rounded-xl text-xs font-medium transition cursor-pointer">
+                  Cancel
+                </button>
+                <button type="submit" id="save-product-changes-btn" class="bg-white hover:bg-zinc-200 text-black px-5 py-2.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-md">
+                  <span>Save Changes</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+        </div>
+      </div>
+    `;
+
+    // Event handlers for modal
+    const viewMode = document.getElementById('product-modal-view-mode');
+    const editMode = document.getElementById('product-modal-edit-mode');
+    const startEditBtn = document.getElementById('start-edit-product-btn');
+    const cancelEditBtn = document.getElementById('cancel-edit-mode-btn');
+    const closeBtn = document.getElementById('close-product-modal-btn');
+    const cancelModalBtn = document.getElementById('cancel-product-modal-btn');
+    const backdrop = document.getElementById('product-modal-backdrop');
+    const editForm = document.getElementById('product-edit-form');
+
+    if (startEditBtn && viewMode && editMode) {
+      startEditBtn.onclick = () => {
+        viewMode.classList.add('hidden');
+        editMode.classList.remove('hidden');
+        if (onEdit) onEdit(product);
+      };
+    }
+
+    if (cancelEditBtn && viewMode && editMode) {
+      cancelEditBtn.onclick = () => {
+        editMode.classList.add('hidden');
+        viewMode.classList.remove('hidden');
+      };
+    }
+
+    const handleClose = () => this.closeProductDetailsModal();
+    if (closeBtn) closeBtn.onclick = handleClose;
+    if (cancelModalBtn) cancelModalBtn.onclick = handleClose;
+    if (backdrop) {
+      backdrop.onclick = (e) => {
+        if (e.target === backdrop) handleClose();
+      };
+    }
+
+    if (editForm && onSave) {
+      editForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const submitBtn = document.getElementById('save-product-changes-btn');
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = `<svg class="animate-spin h-3.5 w-3.5 inline text-black mr-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Saving...`;
+        }
+
+        const updateData = {
+          name: document.getElementById('edit-product-name')?.value.trim() || product.name,
+          price: document.getElementById('edit-product-price')?.value || product.price,
+          description: document.getElementById('edit-product-description')?.value.trim() || product.description,
+          imageUrl: document.getElementById('edit-product-image')?.value.trim() || product.imageUrl,
+          isActive: document.getElementById('edit-product-status')?.value === 'true'
+        };
+
+        try {
+          await onSave(product.id, updateData);
+          this.closeProductDetailsModal();
+        } catch (err) {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Changes';
+          }
+          const fb = document.getElementById('product-edit-feedback');
+          if (fb) {
+            fb.className = "text-xs py-2 px-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 block";
+            fb.textContent = err.serverMessage || err.message || "Failed to update product.";
+          }
+        }
+      };
+    }
+  }
+
+  closeProductDetailsModal() {
+    if (this.modalContainer) {
+      this.modalContainer.innerHTML = '';
     }
   }
 

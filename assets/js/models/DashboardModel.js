@@ -553,4 +553,34 @@ export class DashboardModel {
     this.cachedUserWorkspaces = null;
     return res;
   }
+
+  /**
+   * Fetches products and variants for a workspace from /products/workspace/:workspaceId
+   */
+  async fetchWorkspaceProducts(workspaceId) {
+    if (!workspaceId) {
+      const err = new Error("workspaceId is required");
+      throw err;
+    }
+
+    const data = await this.apiService.fetchWorkspaceProducts(workspaceId);
+    let productsList = [];
+    if (Array.isArray(data)) {
+      productsList = data;
+    } else if (data && typeof data === 'object') {
+      if (Array.isArray(data.products)) productsList = data.products;
+      else if (Array.isArray(data.data)) productsList = data.data;
+      else if (data.id !== undefined) productsList = [data];
+    }
+
+    return productsList;
+  }
+
+  /**
+   * Updates product data using PUT /products/:id
+   */
+  async updateProduct(productId, productData) {
+    const data = await this.apiService.updateProduct(productId, productData);
+    return data;
+  }
 }

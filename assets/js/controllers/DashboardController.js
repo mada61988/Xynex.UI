@@ -10,6 +10,7 @@ export class DashboardController {
     this.lastMessagesSyncedTime = null;
     this.currentSelectedWorkspaceId = 'all';
     this.cachedOverallData = null;
+    this.selectedProductsWorkspaceId = null;
     this.chatsController = new ChatsController(this.authModel, this.model);
   }
 
@@ -389,6 +390,36 @@ export class DashboardController {
       }
     } else if (target === 'create-workspace') {
       this.view.showSection('create-workspace');
+    } else if (target === 'products') {
+      this.view.showSection('products');
+
+      const clerkId = this.authModel?.user?.id || window.Clerk?.user?.id;
+      let workspacesData = this.model.cachedUserWorkspaces;
+      if (!workspacesData && clerkId) {
+        try {
+          workspacesData = await this.model.fetchUserWorkspaces(clerkId);
+        } catch (e) {
+          console.warn("DashboardController: Failed to fetch workspaces for products:", e);
+        }
+      }
+
+      const workspaces = workspacesData?.workspaces || workspacesData?.profiles || [];
+
+      // The first entering for this page, view the first workspace is for that user
+      if (!this.selectedProductsWorkspaceId && workspaces.length > 0) {
+        this.selectedProductsWorkspaceId = workspaces[0].id;
+      }
+
+      this.view.renderProductsWorkspaceOptions(workspaces, this.selectedProductsWorkspaceId);
+      this.view.bindProductsWorkspaceChange(async (newWorkspaceId) => {
+        await this.loadWorkspaceProducts(newWorkspaceId);
+      });
+
+      if (this.selectedProductsWorkspaceId) {
+        await this.loadWorkspaceProducts(this.selectedProductsWorkspaceId);
+      } else if (workspaces.length === 0) {
+        this.view.renderProductsError("No workspaces found for this user.");
+      }
     } else if (target === 'conversations' || target === 'chats') {
       this.view.showSection('conversations');
       if (this.chatsController) {
@@ -397,6 +428,32 @@ export class DashboardController {
     } else {
       // Default to overview section
       this.view.showSection('overview');
+    }
+  }
+
+  async loadWorkspaceProducts(workspaceId) {
+    if (!workspaceId) return;
+    this.selectedProductsWorkspaceId = workspaceId;
+    this.view.renderProductsLoading();
+
+    try {
+      const products = await this.model.fetchWorkspaceProducts(workspaceId);
+      this.view.renderProductsGrid(products, (product) => {
+        this.view.openProductDetailsModal(product, {
+          onEdit: (p) => {
+            console.log("Editing product in modal:", p.id);
+          },
+          onSave: async (productId, updateData) => {
+            await this.model.updateProduct(productId, updateData);
+            // Refresh products for this workspace after save
+            await this.loadWorkspaceProducts(this.selectedProductsWorkspaceId);
+          }
+        });
+      });
+    } catch (err) {
+      console.error(`DashboardController: Error loading products for workspace ${workspaceId}:`, err);
+      const serverMessage = err.serverMessage || err.message || "Failed to load products";
+      this.view.renderProductsError(serverMessage, () => this.loadWorkspaceProducts(workspaceId));
     }
   }
 

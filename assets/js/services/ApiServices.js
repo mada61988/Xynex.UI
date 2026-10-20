@@ -775,4 +775,67 @@ export class ApiService {
 
     return await response.json().catch(() => ({ success: true }));
   }
+
+  async fetchWorkspaceProducts(workspaceId) {
+    if (!workspaceId) {
+      throw new Error("workspaceId is required to fetch products");
+    }
+    const headers = await this.getHeaders();
+    const response = await fetch(`${CONFIG.API_BASE_URL}/products/workspace/${encodeURIComponent(workspaceId)}`, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      let serverMessage = response.statusText;
+      try {
+        const errorData = await response.json();
+        serverMessage = errorData.message || errorData.error || errorData.detail || JSON.stringify(errorData);
+      } catch (e) {
+        try {
+          const text = await response.text();
+          if (text) serverMessage = text;
+        } catch (_) {}
+      }
+
+      const err = new Error(serverMessage || `Request failed with status ${response.status}`);
+      err.status = response.status;
+      err.serverMessage = serverMessage;
+      throw err;
+    }
+
+    return await response.json();
+  }
+
+  async updateProduct(productId, productData) {
+    if (!productId) {
+      throw new Error("productId is required to update product");
+    }
+    const headers = await this.getHeaders();
+    const response = await fetch(`${CONFIG.API_BASE_URL}/products/${encodeURIComponent(productId)}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(productData)
+    });
+
+    if (!response.ok) {
+      let serverMessage = response.statusText;
+      try {
+        const errorData = await response.json();
+        serverMessage = errorData.message || errorData.error || errorData.detail || JSON.stringify(errorData);
+      } catch (e) {
+        try {
+          const text = await response.text();
+          if (text) serverMessage = text;
+        } catch (_) {}
+      }
+
+      const err = new Error(serverMessage || `Failed to update product: ${response.statusText}`);
+      err.status = response.status;
+      err.serverMessage = serverMessage;
+      throw err;
+    }
+
+    return await response.json();
+  }
 }

@@ -415,6 +415,10 @@ export class DashboardController {
         await this.loadWorkspaceProducts(newWorkspaceId);
       });
 
+      this.view.bindAddProductButton(() => {
+        this.handleOpenCreateProduct();
+      });
+
       if (this.selectedProductsWorkspaceId) {
         await this.loadWorkspaceProducts(this.selectedProductsWorkspaceId);
       } else if (workspaces.length === 0) {
@@ -431,6 +435,21 @@ export class DashboardController {
     }
   }
 
+  handleOpenCreateProduct() {
+    if (!this.selectedProductsWorkspaceId) {
+      this.view.showToast({ type: 'error', message: 'Please select a workspace before adding a product.' });
+      return;
+    }
+    this.view.openCreateProductModal({
+      workspaceId: this.selectedProductsWorkspaceId,
+      onSubmit: async (productData) => {
+        await this.model.createProduct(productData);
+        this.view.showToast({ type: 'success', message: `Product "${productData.name}" created successfully!` });
+        await this.loadWorkspaceProducts(this.selectedProductsWorkspaceId);
+      }
+    });
+  }
+
   async loadWorkspaceProducts(workspaceId) {
     if (!workspaceId) return;
     this.selectedProductsWorkspaceId = workspaceId;
@@ -440,6 +459,7 @@ export class DashboardController {
       const products = await this.model.fetchWorkspaceProducts(workspaceId);
 
       const handlers = {
+        onAddProduct: () => this.handleOpenCreateProduct(),
         onProductClick: (product) => {
           this.view.openProductDetailsModal(product, {
             onEdit: (p) => {

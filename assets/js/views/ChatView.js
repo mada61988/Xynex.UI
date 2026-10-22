@@ -71,6 +71,7 @@ export class ChatView {
       this.activeChatContainer.classList.remove('hidden');
       this.activeChatContainer.classList.add('flex', 'w-full');
     }
+    this.scrollToBottom();
   }
 
   showMobileListView() {
@@ -707,6 +708,48 @@ export class ChatView {
     if (this.mobileContextContent) {
       this.mobileContextContent.innerHTML = contextHtml;
     }
+
+    // Automatically scroll to the bottom of the conversation stream (most recent messages)
+    this.scrollToBottom();
+  }
+
+  /**
+   * Scrolls the active chat stream container to the bottom so newest messages are immediately visible
+   */
+  scrollToBottom({ smooth = false } = {}) {
+    const stream = document.getElementById('active-chat-stream');
+    if (!stream) return;
+
+    const performScroll = () => {
+      if (smooth) {
+        stream.scrollTo({
+          top: stream.scrollHeight,
+          behavior: 'smooth'
+        });
+      } else {
+        stream.scrollTop = stream.scrollHeight;
+      }
+    };
+
+    // 1. Immediate scroll execution
+    performScroll();
+
+    // 2. Next animation frame (DOM paint cycle)
+    requestAnimationFrame(() => {
+      performScroll();
+      // 3. Staggered ticks for layout reflow and font metric settlement
+      setTimeout(performScroll, 50);
+      setTimeout(performScroll, 150);
+    });
+
+    // 4. Attach load listeners for any media or attachments in the stream
+    const images = stream.querySelectorAll('img');
+    images.forEach(img => {
+      if (!img.complete) {
+        img.addEventListener('load', () => performScroll(), { once: true });
+        img.addEventListener('error', () => performScroll(), { once: true });
+      }
+    });
   }
 
   renderChatMessages(chat, messages) {
@@ -724,7 +767,7 @@ export class ChatView {
     }
 
     stream.innerHTML = list.map(msg => this._buildMessageBubbleHtml(msg, chat)).join('');
-    stream.scrollTop = stream.scrollHeight;
+    this.scrollToBottom();
   }
 
   renderNoActiveChat() {

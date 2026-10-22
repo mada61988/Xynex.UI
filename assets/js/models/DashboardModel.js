@@ -577,6 +577,14 @@ export class DashboardModel {
   }
 
   /**
+   * Creates a new product with variants using POST /products/
+   */
+  async createProduct(productData) {
+    const data = await this.apiService.createProduct(productData);
+    return data;
+  }
+
+  /**
    * Updates product data using PUT /products/:id
    */
   async updateProduct(productId, productData) {

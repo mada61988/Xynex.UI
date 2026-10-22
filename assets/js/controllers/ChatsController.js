@@ -264,6 +264,7 @@ export class ChatsController {
         };
         // Re-render complete chat timeline and context sidebar
         this.view.renderActiveChat(chat, chat.messages);
+        this.view.scrollToBottom();
 
         // 3. Fetch customer orders using GET /orders/sender/:senderId
         const senderId = chat.senderId || (typeof chat.sender_id === 'object' ? chat.sender_id.id : chat.sender_id);

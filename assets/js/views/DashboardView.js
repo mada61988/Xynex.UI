@@ -3280,17 +3280,39 @@ export class DashboardView {
     }
   }
 
-  renderProductsEmpty() {
+  renderProductsEmpty(onAddClick = null) {
     if (!this.productsGridContainer) return;
     this.productsGridContainer.innerHTML = `
-      <div class="bento-card rounded-3xl p-16 text-center flex flex-col items-center justify-center gap-3 text-zinc-400">
-        <div class="w-14 h-14 rounded-2xl bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-zinc-500 text-2xl">
+      <div class="bento-card rounded-3xl p-16 text-center flex flex-col items-center justify-center gap-4 text-zinc-400">
+        <div class="w-16 h-16 rounded-2xl bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-zinc-400 text-3xl shadow-lg">
           <i class="fa-solid fa-box-open"></i>
         </div>
         <div class="text-base font-bold text-white">No products found</div>
         <p class="text-xs text-zinc-500 max-w-sm">This workspace does not have any product catalog items registered yet.</p>
+        <button type="button" id="btn-empty-add-product" class="mt-2 inline-flex items-center gap-2 bg-white hover:bg-zinc-200 text-black px-5 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer shadow-md">
+          <i class="fa-solid fa-plus text-xs"></i>
+          <span>Add First Product</span>
+        </button>
       </div>
     `;
+
+    const emptyBtn = document.getElementById('btn-empty-add-product');
+    if (emptyBtn) {
+      emptyBtn.onclick = () => {
+        if (onAddClick) onAddClick();
+        else if (this.onAddProductClick) this.onAddProductClick();
+      };
+    }
+  }
+
+  bindAddProductButton(handler) {
+    this.onAddProductClick = handler;
+    const addBtn = document.getElementById('btn-add-product');
+    if (addBtn) {
+      addBtn.onclick = () => {
+        if (this.onAddProductClick) this.onAddProductClick();
+      };
+    }
   }
 
   /**
@@ -3530,7 +3552,7 @@ export class DashboardView {
     const { onProductClick } = handlers;
 
     if (!products || products.length === 0) {
-      this.renderProductsEmpty();
+      this.renderProductsEmpty(handlers.onAddProduct);
       return;
     }
 
@@ -3658,7 +3680,7 @@ export class DashboardView {
     const onProductClick = typeof handlers === 'function' ? handlers : handlers.onProductClick;
 
     if (!products || products.length === 0) {
-      this.renderProductsEmpty();
+      this.renderProductsEmpty(handlers.onAddProduct);
       return;
     }
 
@@ -3772,7 +3794,7 @@ export class DashboardView {
     this.cachedProductsHandlers = handlers;
 
     if (!products || products.length === 0) {
-      this.renderProductsEmpty();
+      this.renderProductsEmpty(handlers.onAddProduct);
       return;
     }
 
@@ -4147,6 +4169,338 @@ export class DashboardView {
   closeProductDetailsModal() {
     if (this.modalContainer) {
       this.modalContainer.innerHTML = '';
+    }
+  }
+
+  /**
+   * Opens the Create Product Modal with full attribute and variant configuration
+   */
+  openCreateProductModal({ workspaceId, onSubmit }) {
+    if (!this.modalContainer) {
+      this.modalContainer = document.getElementById('modal-container');
+    }
+    if (!this.modalContainer) return;
+
+    let attributesList = ['Size', 'Color'];
+
+    this.modalContainer.innerHTML = `
+      <div id="create-product-modal-backdrop" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+        <div class="bento-card w-full max-w-2xl rounded-3xl p-6 sm:p-8 relative border border-zinc-700/80 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
+          
+          <!-- Close Button -->
+          <button type="button" id="close-create-product-modal-btn" class="absolute top-5 right-5 text-zinc-400 hover:text-white p-2 rounded-xl hover:bg-zinc-800 transition cursor-pointer" aria-label="Close modal">
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+
+          <div class="pb-4 border-b border-zinc-800">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-xl bg-white text-black flex items-center justify-center font-bold text-sm shadow-md">
+                <i class="fa-solid fa-box-open"></i>
+              </div>
+              <h2 class="text-lg sm:text-xl font-bold text-white tracking-tight">Add New Product</h2>
+            </div>
+            <p class="text-xs text-zinc-400 mt-1">Create a catalog item with attributes and inventory for Workspace #${workspaceId || ''}</p>
+          </div>
+
+          <form id="create-product-form" class="space-y-5 mt-5">
+            <div id="create-product-feedback" class="hidden text-xs py-2.5 px-3.5 rounded-xl"></div>
+
+            <!-- Field: Name -->
+            <div>
+              <label for="new-product-name" class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">
+                Product Name <span class="text-rose-400">*</span>
+              </label>
+              <input 
+                type="text" 
+                id="new-product-name" 
+                required 
+                placeholder="e.g. Signature Cotton Hoodie" 
+                class="w-full bg-[#0d0d10] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition"
+              />
+            </div>
+
+            <!-- Grid: Price & Status -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label for="new-product-price" class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">
+                  Base Price ($) <span class="text-rose-400">*</span>
+                </label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
+                    <span class="text-xs font-mono font-bold">$</span>
+                  </div>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    min="0" 
+                    id="new-product-price" 
+                    required 
+                    placeholder="49.99" 
+                    class="w-full bg-[#0d0d10] border border-zinc-800 rounded-xl pl-8 pr-3.5 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label for="new-product-status" class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">
+                  Initial Status
+                </label>
+                <select 
+                  id="new-product-status" 
+                  class="w-full bg-[#0d0d10] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-zinc-500 cursor-pointer"
+                >
+                  <option value="true" selected>Active (Storefront Visible)</option>
+                  <option value="false">Draft (Hidden)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Field: Image URL -->
+            <div>
+              <label for="new-product-image" class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">
+                Image URL (Optional)
+              </label>
+              <input 
+                type="url" 
+                id="new-product-image" 
+                placeholder="https://images.unsplash.com/..." 
+                class="w-full bg-[#0d0d10] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500 transition"
+              />
+            </div>
+
+            <!-- Field: Description -->
+            <div>
+              <label for="new-product-description" class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">
+                Description (Optional)
+              </label>
+              <textarea 
+                id="new-product-description" 
+                rows="2" 
+                placeholder="Brief summary of fabric, specs, or styling notes..." 
+                class="w-full bg-[#0d0d10] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500 transition"
+              ></textarea>
+            </div>
+
+            <!-- Section: Product Attributes Tag Manager -->
+            <div class="pt-3 border-t border-zinc-800/80">
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-300">
+                  Product Attributes <span class="text-rose-400">*</span>
+                </label>
+                <span class="text-[10px] text-zinc-500">Dimensions (e.g. Size, Color, Material)</span>
+              </div>
+              
+              <div class="p-3 rounded-2xl bg-[#0d0d10] border border-zinc-800 space-y-2.5">
+                <div id="new-product-attributes-tags" class="flex flex-wrap gap-1.5 min-h-[28px]">
+                  <!-- Rendered dynamically -->
+                </div>
+                
+                <div class="flex items-center gap-2">
+                  <input 
+                    type="text" 
+                    id="new-product-attr-input" 
+                    placeholder="Add an attribute (e.g. Material) and press Enter" 
+                    class="flex-1 bg-[#18181b] border border-zinc-700/80 rounded-xl px-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
+                  />
+                  <button 
+                    type="button" 
+                    id="new-product-add-attr-btn" 
+                    class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 px-3 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer"
+                  >
+                    + Add
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Section: Initial Variant Setup -->
+            <div class="pt-3 border-t border-zinc-800/80">
+              <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">
+                Initial Stock & SKU <span class="text-rose-400">*</span>
+              </label>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <input 
+                    type="text" 
+                    id="new-product-sku" 
+                    placeholder="SKU (e.g. HOODIE-BLK-01)" 
+                    class="w-full bg-[#0d0d10] border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white font-mono placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                  />
+                </div>
+                <div>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    id="new-product-stock" 
+                    value="25" 
+                    placeholder="Initial Stock" 
+                    class="w-full bg-[#0d0d10] border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white font-mono placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="pt-4 border-t border-zinc-800 flex items-center justify-end gap-3">
+              <button 
+                type="button" 
+                id="cancel-create-product-btn" 
+                class="border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 px-4 py-2.5 rounded-xl text-xs font-medium transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                id="submit-create-product-btn" 
+                class="bg-white hover:bg-zinc-200 text-black px-6 py-2.5 rounded-xl text-xs font-semibold transition flex items-center gap-2 cursor-pointer shadow-md"
+              >
+                <i class="fa-solid fa-plus text-xs"></i>
+                <span>Create Product</span>
+              </button>
+            </div>
+          </form>
+
+        </div>
+      </div>
+    `;
+
+    // Render attribute tags inside modal
+    const tagsContainer = document.getElementById('new-product-attributes-tags');
+    const attrInput = document.getElementById('new-product-attr-input');
+    const addAttrBtn = document.getElementById('new-product-add-attr-btn');
+
+    const renderTags = () => {
+      if (!tagsContainer) return;
+      if (attributesList.length === 0) {
+        tagsContainer.innerHTML = `<span class="text-xs text-zinc-500 italic">No attributes added yet.</span>`;
+        return;
+      }
+      tagsContainer.innerHTML = attributesList.map(a => `
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-800 text-zinc-200 border border-zinc-700/80 text-xs font-medium">
+          <span>${this._escape(a)}</span>
+          <button type="button" class="remove-tag-btn text-zinc-500 hover:text-rose-400 p-0.5 cursor-pointer text-[10px]" data-tag="${this._escape(a)}">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </span>
+      `).join('');
+
+      tagsContainer.querySelectorAll('.remove-tag-btn').forEach(btn => {
+        btn.onclick = () => {
+          const tag = btn.dataset.tag;
+          attributesList = attributesList.filter(t => t !== tag);
+          renderTags();
+        };
+      });
+    };
+
+    renderTags();
+
+    const addTag = () => {
+      const val = attrInput?.value.trim();
+      if (!val) return;
+      if (!attributesList.includes(val)) {
+        attributesList.push(val);
+        renderTags();
+      }
+      if (attrInput) {
+        attrInput.value = '';
+        attrInput.focus();
+      }
+    };
+
+    if (addAttrBtn) addAttrBtn.onclick = addTag;
+    if (attrInput) {
+      attrInput.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          addTag();
+        }
+      };
+    }
+
+    // Modal controls
+    const closeBtn = document.getElementById('close-create-product-modal-btn');
+    const cancelBtn = document.getElementById('cancel-create-product-btn');
+    const backdrop = document.getElementById('create-product-modal-backdrop');
+    const form = document.getElementById('create-product-form');
+
+    const handleClose = () => this.closeProductDetailsModal();
+    if (closeBtn) closeBtn.onclick = handleClose;
+    if (cancelBtn) cancelBtn.onclick = handleClose;
+    if (backdrop) {
+      backdrop.onclick = (e) => {
+        if (e.target === backdrop) handleClose();
+      };
+    }
+
+    if (form) {
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        const submitBtn = document.getElementById('submit-create-product-btn');
+        const feedback = document.getElementById('create-product-feedback');
+
+        if (attributesList.length === 0) {
+          if (feedback) {
+            feedback.className = "text-xs py-2 px-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 block";
+            feedback.textContent = "Please add at least one product attribute (e.g. Size, Color).";
+          }
+          return;
+        }
+
+        const name = document.getElementById('new-product-name')?.value.trim();
+        const price = parseFloat(document.getElementById('new-product-price')?.value || '0');
+        const isActive = document.getElementById('new-product-status')?.value === 'true';
+        const imageUrl = document.getElementById('new-product-image')?.value.trim() || null;
+        const description = document.getElementById('new-product-description')?.value.trim() || null;
+        const sku = document.getElementById('new-product-sku')?.value.trim() || `${name.replace(/\s+/g, '-').toUpperCase().slice(0, 8)}-01`;
+        const stock = parseInt(document.getElementById('new-product-stock')?.value || '10', 10);
+
+        // Build default variant attributes map
+        const variantAttributes = {};
+        attributesList.forEach(a => {
+          variantAttributes[a] = 'Standard';
+        });
+
+        const productPayload = {
+          workspaceId: Number(workspaceId),
+          name,
+          price,
+          isActive,
+          imageUrl,
+          description,
+          attributes: attributesList,
+          productVariants: [
+            {
+              sku,
+              price,
+              stock: isNaN(stock) ? 10 : stock,
+              imageUrl,
+              attributes: variantAttributes
+            }
+          ]
+        };
+
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = `<svg class="animate-spin h-3.5 w-3.5 inline text-black mr-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Creating...`;
+        }
+
+        try {
+          if (onSubmit) {
+            await onSubmit(productPayload);
+          }
+          this.closeProductDetailsModal();
+        } catch (err) {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `<i class="fa-solid fa-plus text-xs"></i><span>Create Product</span>`;
+          }
+          if (feedback) {
+            feedback.className = "text-xs py-2 px-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 block";
+            feedback.textContent = err.serverMessage || err.message || "Failed to create product.";
+          }
+        }
+      };
     }
   }
 

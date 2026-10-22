@@ -56,6 +56,9 @@ export class DashboardView {
     this.productsSection = document.getElementById('section-products');
     this.productsGridContainer = document.getElementById('products-grid-container');
     this.productsWorkspaceSelect = document.getElementById('products-workspace-select');
+    this.productsViewMode = 'table';
+    this.cachedProducts = [];
+    this.cachedProductsHandlers = null;
 
     // Callbacks for role editing
     this.onEditRoleClick = null;
@@ -63,6 +66,7 @@ export class DashboardView {
 
     this._bindWorkspacesDropdownEvents();
     this._bindSidebarLogout();
+    this._bindProductsViewToggle();
   }
 
   _bindSidebarLogout() {
@@ -3126,6 +3130,100 @@ export class DashboardView {
     }
   }
 
+  /**
+   * Luxury Toast Notification System
+   */
+  showToast({ type = 'info', message = '' } = {}) {
+    let toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) {
+      toastContainer = document.createElement('div');
+      toastContainer.id = 'toast-container';
+      toastContainer.className = 'fixed bottom-6 right-6 z-50 flex flex-col gap-2.5 pointer-events-none';
+      document.body.appendChild(toastContainer);
+    }
+
+    const toast = document.createElement('div');
+    const isSuccess = type === 'success';
+    const isError = type === 'error';
+
+    const icon = isSuccess 
+      ? '<i class="fa-solid fa-circle-check text-emerald-400 text-sm"></i>' 
+      : (isError 
+        ? '<i class="fa-solid fa-triangle-exclamation text-rose-400 text-sm"></i>' 
+        : '<i class="fa-solid fa-circle-info text-sky-400 text-sm"></i>');
+
+    const borderStyle = isSuccess 
+      ? 'border-emerald-500/30 shadow-emerald-500/10' 
+      : (isError ? 'border-rose-500/30 shadow-rose-500/10' : 'border-zinc-700/80');
+
+    toast.className = `flex items-center gap-3 px-4 py-3 rounded-2xl bg-[#111114]/95 backdrop-blur-xl border ${borderStyle} text-white shadow-2xl text-xs font-medium pointer-events-auto transition-all duration-300 transform translate-y-3 opacity-0 max-w-sm`;
+    toast.innerHTML = `
+      ${icon}
+      <span class="flex-1 leading-snug">${this._escape(message)}</span>
+      <button type="button" class="text-zinc-500 hover:text-zinc-300 text-xs ml-1 cursor-pointer">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    `;
+
+    const closeBtn = toast.querySelector('button');
+    if (closeBtn) {
+      closeBtn.onclick = () => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      };
+    }
+
+    toastContainer.appendChild(toast);
+    requestAnimationFrame(() => {
+      toast.classList.remove('opacity-0', 'translate-y-3');
+    });
+
+    setTimeout(() => {
+      if (toast.parentElement) {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }
+    }, 3500);
+  }
+
+  _bindProductsViewToggle() {
+    const tableBtn = document.getElementById('products-view-table-btn');
+    const gridBtn = document.getElementById('products-view-grid-btn');
+    if (!tableBtn || !gridBtn) return;
+
+    tableBtn.onclick = () => {
+      if (this.productsViewMode === 'table') return;
+      this.productsViewMode = 'table';
+      this._updateProductsViewToggleButtons();
+      if (this.cachedProducts && this.cachedProductsHandlers) {
+        this.renderProductsCatalog(this.cachedProducts, this.cachedProductsHandlers);
+      }
+    };
+
+    gridBtn.onclick = () => {
+      if (this.productsViewMode === 'grid') return;
+      this.productsViewMode = 'grid';
+      this._updateProductsViewToggleButtons();
+      if (this.cachedProducts && this.cachedProductsHandlers) {
+        this.renderProductsCatalog(this.cachedProducts, this.cachedProductsHandlers);
+      }
+    };
+  }
+
+  _updateProductsViewToggleButtons() {
+    const tableBtn = document.getElementById('products-view-table-btn');
+    const gridBtn = document.getElementById('products-view-grid-btn');
+    if (!tableBtn || !gridBtn) return;
+
+    if (this.productsViewMode === 'table') {
+      tableBtn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-white bg-zinc-800 border border-zinc-700/80 shadow-sm cursor-pointer";
+      gridBtn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-zinc-400 hover:text-white cursor-pointer";
+    } else {
+      gridBtn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-white bg-zinc-800 border border-zinc-700/80 shadow-sm cursor-pointer";
+      tableBtn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-zinc-400 hover:text-white cursor-pointer";
+    }
+  }
+
   renderProductsWorkspaceOptions(workspaces, selectedWorkspaceId) {
     if (!this.productsWorkspaceSelect) return;
     if (!workspaces || workspaces.length === 0) {
@@ -3182,26 +3280,392 @@ export class DashboardView {
     }
   }
 
-  renderProductsGrid(products, onProductClick) {
+  renderProductsEmpty() {
     if (!this.productsGridContainer) return;
+    this.productsGridContainer.innerHTML = `
+      <div class="bento-card rounded-3xl p-16 text-center flex flex-col items-center justify-center gap-3 text-zinc-400">
+        <div class="w-14 h-14 rounded-2xl bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-zinc-500 text-2xl">
+          <i class="fa-solid fa-box-open"></i>
+        </div>
+        <div class="text-base font-bold text-white">No products found</div>
+        <p class="text-xs text-zinc-500 max-w-sm">This workspace does not have any product catalog items registered yet.</p>
+      </div>
+    `;
+  }
+
+  /**
+   * Renders interactive attribute chips with inline edit and delete actions, plus + Add button
+   */
+  renderProductAttributesChips(productId, rawAttributes, { showLabels = true } = {}) {
+    const list = Array.isArray(rawAttributes) 
+      ? rawAttributes 
+      : (rawAttributes && typeof rawAttributes === 'object' ? Object.keys(rawAttributes) : []);
+
+    const chipsHtml = list.map(attr => `
+      <div class="product-attr-chip group/chip relative inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#18181b] hover:bg-[#202024] border border-zinc-700/70 text-zinc-200 text-xs font-medium transition shadow-sm" data-product-id="${productId}" data-attribute="${this._escape(attr)}">
+        <span class="attr-label select-none cursor-pointer hover:text-white" title="Click to edit attribute">${this._escape(attr)}</span>
+        
+        <button type="button" class="btn-edit-attr text-zinc-500 hover:text-zinc-200 opacity-60 group-hover/chip:opacity-100 transition p-0.5 cursor-pointer text-[10px]" title="Edit attribute">
+          <i class="fa-solid fa-pen text-[9px]"></i>
+        </button>
+
+        <button type="button" class="btn-delete-attr text-zinc-500 hover:text-rose-400 opacity-60 group-hover/chip:opacity-100 transition p-0.5 cursor-pointer text-[11px]" title="Remove attribute">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+
+        <!-- Inline Edit Box -->
+        <div class="attr-edit-box hidden absolute inset-0 bg-[#18181b] rounded-lg border border-zinc-500 flex items-center px-1.5 z-10 shadow-lg">
+          <input type="text" class="attr-edit-input w-24 bg-transparent text-xs text-white focus:outline-none font-medium" value="${this._escape(attr)}" />
+          <button type="button" class="btn-confirm-edit text-emerald-400 hover:text-emerald-300 p-1 text-[10px] cursor-pointer" title="Save"><i class="fa-solid fa-check"></i></button>
+          <button type="button" class="btn-cancel-edit text-zinc-400 hover:text-zinc-200 p-1 text-[10px] cursor-pointer" title="Cancel"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+    `).join('');
+
+    const addBtnHtml = `
+      <div class="inline-flex items-center attr-add-wrapper" data-product-id="${productId}">
+        <button type="button" class="btn-open-add-attr border border-dashed border-zinc-700/90 hover:border-zinc-500 hover:bg-zinc-800/40 text-zinc-400 hover:text-zinc-200 px-2.5 py-1 rounded-lg text-xs font-medium inline-flex items-center gap-1 transition cursor-pointer">
+          <i class="fa-solid fa-plus text-[9px]"></i>
+          <span>Add</span>
+        </button>
+        <div class="attr-add-box hidden items-center gap-1 bg-[#18181b] border border-zinc-600 rounded-lg px-2 py-0.5 shadow-lg">
+          <input type="text" placeholder="e.g. Material" class="attr-add-input w-24 bg-transparent text-xs text-white focus:outline-none placeholder-zinc-500 font-medium" />
+          <button type="button" class="btn-confirm-add text-emerald-400 hover:text-emerald-300 p-1 text-[10px] cursor-pointer" title="Add attribute"><i class="fa-solid fa-check"></i></button>
+          <button type="button" class="btn-cancel-add text-zinc-400 hover:text-zinc-200 p-1 text-[10px] cursor-pointer" title="Cancel"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+    `;
+
+    return `<div class="flex items-center gap-1.5 flex-wrap attributes-list-container" data-product-id="${productId}">${chipsHtml}${addBtnHtml}</div>`;
+  }
+
+  /**
+   * Binds interaction events to all attribute chips and add triggers
+   */
+  bindProductAttributesEvents(container, { onAddAttribute, onEditAttribute, onDeleteAttribute } = {}) {
+    if (!container) return;
+
+    // 1. Open Add Box
+    container.querySelectorAll('.btn-open-add-attr').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const wrapper = btn.closest('.attr-add-wrapper');
+        const addBox = wrapper?.querySelector('.attr-add-box');
+        const input = wrapper?.querySelector('.attr-add-input');
+        if (addBox && input) {
+          btn.classList.add('hidden');
+          addBox.classList.remove('hidden');
+          addBox.classList.add('flex');
+          input.value = '';
+          input.focus();
+        }
+      };
+    });
+
+    // Cancel Add Box
+    container.querySelectorAll('.btn-cancel-add').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const wrapper = btn.closest('.attr-add-wrapper');
+        const openBtn = wrapper?.querySelector('.btn-open-add-attr');
+        const addBox = wrapper?.querySelector('.attr-add-box');
+        if (openBtn && addBox) {
+          addBox.classList.add('hidden');
+          addBox.classList.remove('flex');
+          openBtn.classList.remove('hidden');
+        }
+      };
+    });
+
+    // Confirm Add
+    const handleConfirmAdd = async (wrapper) => {
+      const pid = Number(wrapper.dataset.productId);
+      const input = wrapper.querySelector('.attr-add-input');
+      const val = input?.value.trim();
+      if (!val) return;
+
+      const confirmBtn = wrapper.querySelector('.btn-confirm-add');
+      if (confirmBtn) {
+        confirmBtn.innerHTML = `<svg class="animate-spin h-3 w-3 inline text-emerald-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+      }
+      if (input) input.disabled = true;
+
+      try {
+        if (onAddAttribute) {
+          await onAddAttribute(pid, val);
+        }
+      } catch (err) {
+        if (confirmBtn) confirmBtn.innerHTML = `<i class="fa-solid fa-check"></i>`;
+        if (input) input.disabled = false;
+        this.showToast({ type: 'error', message: err.serverMessage || err.message || 'Failed to add attribute' });
+      }
+    };
+
+    container.querySelectorAll('.btn-confirm-add').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        handleConfirmAdd(btn.closest('.attr-add-wrapper'));
+      };
+    });
+
+    container.querySelectorAll('.attr-add-input').forEach(input => {
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          handleConfirmAdd(input.closest('.attr-add-wrapper'));
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          const wrapper = input.closest('.attr-add-wrapper');
+          wrapper?.querySelector('.btn-cancel-add')?.click();
+        }
+      };
+    });
+
+    // 2. Open Edit Box
+    container.querySelectorAll('.btn-edit-attr, .attr-label').forEach(el => {
+      el.onclick = (e) => {
+        e.stopPropagation();
+        const chip = el.closest('.product-attr-chip');
+        const editBox = chip?.querySelector('.attr-edit-box');
+        const input = chip?.querySelector('.attr-edit-input');
+        if (editBox && input) {
+          editBox.classList.remove('hidden');
+          input.focus();
+          input.select();
+        }
+      };
+    });
+
+    // Cancel Edit Box
+    container.querySelectorAll('.btn-cancel-edit').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const chip = btn.closest('.product-attr-chip');
+        chip?.querySelector('.attr-edit-box')?.classList.add('hidden');
+      };
+    });
+
+    // Confirm Edit
+    const handleConfirmEdit = async (chip) => {
+      const pid = Number(chip.dataset.productId);
+      const oldAttr = chip.dataset.attribute;
+      const input = chip.querySelector('.attr-edit-input');
+      const newAttr = input?.value.trim();
+
+      if (!newAttr || newAttr === oldAttr) {
+        chip.querySelector('.attr-edit-box')?.classList.add('hidden');
+        return;
+      }
+
+      const confirmBtn = chip.querySelector('.btn-confirm-edit');
+      if (confirmBtn) {
+        confirmBtn.innerHTML = `<svg class="animate-spin h-3 w-3 inline text-emerald-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+      }
+      if (input) input.disabled = true;
+
+      try {
+        if (onEditAttribute) {
+          await onEditAttribute(pid, oldAttr, newAttr);
+        }
+      } catch (err) {
+        if (confirmBtn) confirmBtn.innerHTML = `<i class="fa-solid fa-check"></i>`;
+        if (input) input.disabled = false;
+        this.showToast({ type: 'error', message: err.serverMessage || err.message || 'Failed to edit attribute' });
+      }
+    };
+
+    container.querySelectorAll('.btn-confirm-edit').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        handleConfirmEdit(btn.closest('.product-attr-chip'));
+      };
+    });
+
+    container.querySelectorAll('.attr-edit-input').forEach(input => {
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          handleConfirmEdit(input.closest('.product-attr-chip'));
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          const chip = input.closest('.product-attr-chip');
+          chip?.querySelector('.btn-cancel-edit')?.click();
+        }
+      };
+    });
+
+    // 3. Delete Attribute
+    container.querySelectorAll('.btn-delete-attr').forEach(btn => {
+      btn.onclick = async (e) => {
+        e.stopPropagation();
+        const chip = btn.closest('.product-attr-chip');
+        const pid = Number(chip.dataset.productId);
+        const attr = chip.dataset.attribute;
+
+        btn.disabled = true;
+        btn.innerHTML = `<svg class="animate-spin h-3 w-3 inline text-rose-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+
+        try {
+          if (onDeleteAttribute) {
+            await onDeleteAttribute(pid, attr);
+          }
+        } catch (err) {
+          btn.disabled = false;
+          btn.innerHTML = `<i class="fa-solid fa-xmark"></i>`;
+          this.showToast({ type: 'error', message: err.serverMessage || err.message || 'Failed to delete attribute' });
+        }
+      };
+    });
+  }
+
+  /**
+   * Enterprise Table View for Products with Interactive Attributes
+   */
+  renderProductsTable(products, handlers = {}) {
+    if (!this.productsGridContainer) return;
+    const { onProductClick } = handlers;
 
     if (!products || products.length === 0) {
-      this.productsGridContainer.innerHTML = `
-        <div class="bento-card rounded-3xl p-16 text-center flex flex-col items-center justify-center gap-3 text-zinc-400">
-          <div class="w-14 h-14 rounded-2xl bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-zinc-500 text-2xl">
-            <i class="fa-solid fa-box-open"></i>
-          </div>
-          <div class="text-base font-bold text-white">No products found</div>
-          <p class="text-xs text-zinc-500 max-w-sm">This workspace does not have any product catalog items registered yet.</p>
-        </div>
+      this.renderProductsEmpty();
+      return;
+    }
+
+    const rowsHtml = products.map(p => {
+      const priceFormatted = `$${Number(p.price || 0).toFixed(2)}`;
+      const variantsCount = Array.isArray(p.productVariants) ? p.productVariants.length : 0;
+      const attributesChips = this.renderProductAttributesChips(p.id, p.attributes);
+
+      let imageHtml;
+      if (p.imageUrl) {
+        imageHtml = `<img src="${this._escape(p.imageUrl)}" alt="${this._escape(p.name)}" class="w-full h-full object-cover" onerror="this.onerror=null;this.parentElement.innerHTML='<i class=\\'fa-solid fa-box text-zinc-600 text-sm\\'></i>';" />`;
+      } else {
+        imageHtml = `<i class="fa-solid fa-box text-zinc-600 text-sm"></i>`;
+      }
+
+      return `
+        <tr class="hover:bg-zinc-800/30 transition group/row" data-product-id="${p.id}">
+          <!-- Product Name & Thumbnail -->
+          <td class="py-3.5 px-5">
+            <div class="flex items-center gap-3.5">
+              <div class="w-11 h-11 rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800 shrink-0 flex items-center justify-center">
+                ${imageHtml}
+              </div>
+              <div class="min-w-0">
+                <div class="text-xs sm:text-sm font-bold text-white hover:text-zinc-200 transition cursor-pointer truncate max-w-[180px] sm:max-w-[220px] btn-product-title" title="${this._escape(p.name)}">
+                  ${this._escape(p.name)}
+                </div>
+                <div class="text-[11px] text-zinc-500 truncate max-w-[180px] sm:max-w-[220px] mt-0.5">
+                  ${this._escape(p.description || 'No description')}
+                </div>
+                <span class="text-[10px] font-mono text-zinc-500">ID #${p.id}</span>
+              </div>
+            </div>
+          </td>
+
+          <!-- Price -->
+          <td class="py-3.5 px-4 font-mono font-extrabold text-xs sm:text-sm text-white whitespace-nowrap">
+            ${priceFormatted}
+          </td>
+
+          <!-- Status -->
+          <td class="py-3.5 px-4 whitespace-nowrap">
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${p.isActive !== false ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm' : 'bg-zinc-800 text-zinc-400 border border-zinc-700'}">
+              ${p.isActive !== false ? 'Active' : 'Draft'}
+            </span>
+          </td>
+
+          <!-- Variants -->
+          <td class="py-3.5 px-4 whitespace-nowrap">
+            <span class="text-[11px] font-semibold text-zinc-400 bg-zinc-800/80 px-2.5 py-1 rounded-lg border border-zinc-700/60 inline-flex items-center gap-1.5">
+              <i class="fa-solid fa-layer-group text-[10px] text-zinc-500"></i>
+              <span>${variantsCount}</span>
+            </span>
+          </td>
+
+          <!-- Attributes (Interactive!) -->
+          <td class="py-3.5 px-5">
+            ${attributesChips}
+          </td>
+
+          <!-- Actions -->
+          <td class="py-3.5 px-5 text-right whitespace-nowrap">
+            <button type="button" class="btn-product-details border border-zinc-700 bg-zinc-900/90 hover:bg-zinc-800 hover:text-white text-zinc-300 px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer shadow-sm inline-flex items-center gap-1.5" data-product-id="${p.id}">
+              <span>Details</span>
+              <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            </button>
+          </td>
+        </tr>
       `;
+    }).join('');
+
+    this.productsGridContainer.innerHTML = `
+      <div class="bento-card rounded-3xl overflow-hidden border border-zinc-800/80 shadow-2xl bg-[#111114]">
+        <!-- Table Toolbar -->
+        <div class="p-5 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#0d0d10]/40">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-zinc-400">Inventory Catalog</span>
+            <span class="text-[11px] font-mono text-zinc-400 bg-zinc-900 border border-zinc-800 px-2.5 py-0.5 rounded-full">${products.length} Products</span>
+          </div>
+          <div class="text-[11px] text-zinc-500 flex items-center gap-1.5">
+            <i class="fa-solid fa-wand-magic-sparkles text-amber-400 text-xs"></i>
+            <span>Interactive attributes: Click to edit, hover <i class="fa-solid fa-xmark text-[10px] text-zinc-400"></i> to delete, or click <span class="text-zinc-300 font-semibold">+ Add</span>.</span>
+          </div>
+        </div>
+
+        <!-- Table Body -->
+        <div class="overflow-x-auto no-scrollbar">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-zinc-800 text-[10px] font-bold uppercase text-zinc-500 tracking-wider bg-[#0d0d10]/80">
+                <th class="py-3.5 px-5">Product</th>
+                <th class="py-3.5 px-4">Price</th>
+                <th class="py-3.5 px-4">Status</th>
+                <th class="py-3.5 px-4">Variants</th>
+                <th class="py-3.5 px-5 min-w-[300px]">Attributes</th>
+                <th class="py-3.5 px-5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-800/60">
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    // Bind Attributes Events
+    this.bindProductAttributesEvents(this.productsGridContainer, handlers);
+
+    // Bind Details click
+    this.productsGridContainer.querySelectorAll('.btn-product-details, .btn-product-title').forEach(btn => {
+      btn.onclick = () => {
+        const pid = Number(btn.closest('[data-product-id]').dataset.productId);
+        const product = products.find(p => p.id === pid);
+        if (product && onProductClick) onProductClick(product);
+      };
+    });
+  }
+
+  /**
+   * Grid Cards View for Products with Interactive Attributes
+   */
+  renderProductsGrid(products, handlers = {}) {
+    if (!this.productsGridContainer) return;
+    const onProductClick = typeof handlers === 'function' ? handlers : handlers.onProductClick;
+
+    if (!products || products.length === 0) {
+      this.renderProductsEmpty();
       return;
     }
 
     const cardsHtml = products.map(p => {
       const priceFormatted = `$${Number(p.price || 0).toFixed(2)}`;
       const variantsCount = Array.isArray(p.productVariants) ? p.productVariants.length : 0;
-      const attributesText = Array.isArray(p.attributes) ? p.attributes.join(', ') : '';
+      const attributesChips = this.renderProductAttributesChips(p.id, p.attributes);
 
       let imageHtml;
       if (p.imageUrl) {
@@ -3225,12 +3689,12 @@ export class DashboardView {
 
       return `
         <div 
-          class="product-box bento-card rounded-2xl p-4 cursor-pointer hover:border-zinc-500/60 transition duration-300 transform hover:-translate-y-1 hover:shadow-2xl flex flex-col justify-between group relative"
+          class="product-box bento-card rounded-2xl p-4 hover:border-zinc-500/60 transition duration-300 transform hover:-translate-y-1 hover:shadow-2xl flex flex-col justify-between group relative"
           data-product-id="${p.id}"
         >
           <div>
             <!-- Product Image Box -->
-            <div class="relative w-full h-44 rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 mb-3 flex items-center justify-center">
+            <div class="relative w-full h-44 rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 mb-3 flex items-center justify-center cursor-pointer btn-open-modal-trigger">
               ${imageHtml}
               <span class="absolute top-2.5 right-2.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm ${p.isActive !== false ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 backdrop-blur-md' : 'bg-zinc-800/90 text-zinc-400 border border-zinc-700'}">
                 ${p.isActive !== false ? 'Active' : 'Draft'}
@@ -3238,7 +3702,7 @@ export class DashboardView {
             </div>
 
             <!-- Product Name -->
-            <h3 class="text-sm font-bold text-white group-hover:text-zinc-200 transition truncate" title="${this._escape(p.name)}">
+            <h3 class="text-sm font-bold text-white group-hover:text-zinc-200 transition truncate cursor-pointer btn-open-modal-trigger" title="${this._escape(p.name)}">
               ${this._escape(p.name)}
             </h3>
 
@@ -3247,12 +3711,17 @@ export class DashboardView {
               ${this._escape(p.description || 'No description provided')}
             </p>
 
-            <!-- Meta tag / Variants info -->
-            <div class="mt-2.5 flex items-center gap-1.5 flex-wrap">
+            <!-- Variants info badge -->
+            <div class="mt-2.5 flex items-center gap-1.5">
               <span class="text-[10px] font-semibold text-zinc-400 bg-zinc-800/80 px-2 py-0.5 rounded-md border border-zinc-700/60">
                 ${variantsCount} ${variantsCount === 1 ? 'Variant' : 'Variants'}
               </span>
-              ${attributesText ? `<span class="text-[10px] text-zinc-500 truncate max-w-[140px]">${this._escape(attributesText)}</span>` : ''}
+            </div>
+
+            <!-- Interactive Attributes Area -->
+            <div class="mt-3 pt-2.5 border-t border-zinc-800/80">
+              <span class="text-[10px] uppercase font-bold text-zinc-500 block mb-1.5">Attributes:</span>
+              ${attributesChips}
             </div>
           </div>
 
@@ -3264,10 +3733,10 @@ export class DashboardView {
                 ${priceFormatted}
               </div>
             </div>
-            <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-400 group-hover:text-white transition">
+            <button type="button" class="btn-card-details inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-400 hover:text-white transition cursor-pointer">
               <span>Details</span>
-              <i class="fa-solid fa-arrow-right text-[10px] transition-transform group-hover:translate-x-0.5"></i>
-            </span>
+              <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            </button>
           </div>
         </div>
       `;
@@ -3279,9 +3748,13 @@ export class DashboardView {
       </div>
     `;
 
-    // Bind click events on product boxes
-    this.productsGridContainer.querySelectorAll('.product-box').forEach(card => {
-      card.onclick = () => {
+    // Bind Attributes Events
+    this.bindProductAttributesEvents(this.productsGridContainer, handlers);
+
+    // Bind click events on cards for details
+    this.productsGridContainer.querySelectorAll('.btn-open-modal-trigger, .btn-card-details').forEach(el => {
+      el.onclick = (e) => {
+        const card = el.closest('.product-box');
         const pid = Number(card.dataset.productId);
         const product = products.find(p => p.id === pid);
         if (product && onProductClick) {
@@ -3291,14 +3764,37 @@ export class DashboardView {
     });
   }
 
-  openProductDetailsModal(product, { onEdit, onSave, onDelete }) {
+  /**
+   * Universal Catalog Renderer routing to active view mode (Table or Grid)
+   */
+  renderProductsCatalog(products, handlers = {}) {
+    this.cachedProducts = products;
+    this.cachedProductsHandlers = handlers;
+
+    if (!products || products.length === 0) {
+      this.renderProductsEmpty();
+      return;
+    }
+
+    if (this.productsViewMode === 'grid') {
+      this.renderProductsGrid(products, handlers);
+    } else {
+      this.renderProductsTable(products, handlers);
+    }
+  }
+
+  /**
+   * Product Details & Attributes Management Modal
+   */
+  openProductDetailsModal(product, handlers = {}) {
+    const { onEdit, onSave, onDelete, onAddAttribute, onEditAttribute, onDeleteAttribute } = handlers;
+
     if (!this.modalContainer) {
       this.modalContainer = document.getElementById('modal-container');
     }
     if (!this.modalContainer) return;
 
     const variants = Array.isArray(product.productVariants) ? product.productVariants : [];
-    const attributesList = Array.isArray(product.attributes) ? product.attributes : [];
 
     let imageHtml;
     if (product.imageUrl) {
@@ -3338,6 +3834,8 @@ export class DashboardView {
       `;
     }).join('');
 
+    const attributesChipsHtml = this.renderProductAttributesChips(product.id, product.attributes);
+
     this.modalContainer.innerHTML = `
       <div id="product-modal-backdrop" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
         <div class="bento-card w-full max-w-2xl rounded-3xl p-6 sm:p-8 relative border border-zinc-700/80 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
@@ -3367,14 +3865,18 @@ export class DashboardView {
 
                 <p class="text-xs sm:text-sm text-zinc-400 leading-relaxed">${this._escape(product.description || 'No description provided.')}</p>
 
-                ${attributesList.length > 0 ? `
-                  <div class="pt-2 border-t border-zinc-800">
-                    <span class="text-[10px] font-bold uppercase text-zinc-500 tracking-wider">Attributes:</span>
-                    <div class="flex gap-1.5 flex-wrap mt-1">
-                      ${attributesList.map(a => `<span class="text-xs font-medium bg-zinc-800/80 text-zinc-300 border border-zinc-700 px-2 py-0.5 rounded-md">${this._escape(a)}</span>`).join('')}
-                    </div>
+                <!-- Interactive Attributes Management Section in Modal -->
+                <div class="pt-3 border-t border-zinc-800">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-bold uppercase text-zinc-400 tracking-wider">Product Attributes:</span>
+                    <span class="text-[10px] text-zinc-500 flex items-center gap-1">
+                      <i class="fa-solid fa-bolt text-amber-400 text-[9px]"></i> Live Sync
+                    </span>
                   </div>
-                ` : ''}
+                  <div id="modal-attributes-container">
+                    ${attributesChipsHtml}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -3511,7 +4013,45 @@ export class DashboardView {
       </div>
     `;
 
-    // Event handlers for modal
+    // Bind Modal Attributes Management Events
+    const modalAttrsContainer = document.getElementById('modal-attributes-container');
+    const refreshModalAttributes = (updatedProduct) => {
+      if (updatedProduct && updatedProduct.attributes !== undefined) {
+        product.attributes = updatedProduct.attributes;
+      }
+      if (modalAttrsContainer) {
+        modalAttrsContainer.innerHTML = this.renderProductAttributesChips(product.id, product.attributes);
+        this.bindProductAttributesEvents(modalAttrsContainer, modalAttrHandlers);
+      }
+    };
+
+    const modalAttrHandlers = {
+      onAddAttribute: async (pid, val) => {
+        if (onAddAttribute) {
+          const res = await onAddAttribute(pid, val);
+          refreshModalAttributes(res);
+          return res;
+        }
+      },
+      onEditAttribute: async (pid, oldVal, newVal) => {
+        if (onEditAttribute) {
+          const res = await onEditAttribute(pid, oldVal, newVal);
+          refreshModalAttributes(res);
+          return res;
+        }
+      },
+      onDeleteAttribute: async (pid, val) => {
+        if (onDeleteAttribute) {
+          const res = await onDeleteAttribute(pid, val);
+          refreshModalAttributes(res);
+          return res;
+        }
+      }
+    };
+
+    this.bindProductAttributesEvents(modalAttrsContainer, modalAttrHandlers);
+
+    // Event handlers for modal modes
     const viewMode = document.getElementById('product-modal-view-mode');
     const editMode = document.getElementById('product-modal-edit-mode');
     const startEditBtn = document.getElementById('start-edit-product-btn');

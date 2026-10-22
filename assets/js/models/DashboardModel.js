@@ -595,4 +595,25 @@ export class DashboardModel {
     const data = await this.apiService.deleteProduct(productId);
     return data;
   }
+
+  /**
+   * Adds an attribute (or multiple) to a product using POST /products/:id/attributes
+   */
+  async addProductAttribute(productId, attributeData) {
+    return await this.apiService.addProductAttribute(productId, attributeData);
+  }
+
+  /**
+   * Updates an existing attribute of a product using PUT /products/:id/attributes/:attribute
+   */
+  async updateProductAttribute(productId, oldAttribute, newAttribute) {
+    return await this.apiService.updateProductAttribute(productId, oldAttribute, newAttribute);
+  }
+
+  /**
+   * Deletes an attribute from a product using DELETE /products/:id/attributes/:attribute
+   */
+  async deleteProductAttribute(productId, attribute) {
+    return await this.apiService.deleteProductAttribute(productId, attribute);
+  }
 }

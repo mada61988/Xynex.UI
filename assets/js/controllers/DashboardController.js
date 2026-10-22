@@ -438,23 +438,68 @@ export class DashboardController {
 
     try {
       const products = await this.model.fetchWorkspaceProducts(workspaceId);
-      this.view.renderProductsGrid(products, (product) => {
-        this.view.openProductDetailsModal(product, {
-          onEdit: (p) => {
-            console.log("Editing product in modal:", p.id);
-          },
-          onSave: async (productId, updateData) => {
-            await this.model.updateProduct(productId, updateData);
-            // Refresh products for this workspace after save
-            await this.loadWorkspaceProducts(this.selectedProductsWorkspaceId);
-          },
-          onDelete: async (productId) => {
-            await this.model.deleteProduct(productId);
-            // Refresh products for this workspace after delete
-            await this.loadWorkspaceProducts(this.selectedProductsWorkspaceId);
-          }
-        });
-      });
+
+      const handlers = {
+        onProductClick: (product) => {
+          this.view.openProductDetailsModal(product, {
+            onEdit: (p) => {
+              console.log("Editing product in modal:", p.id);
+            },
+            onSave: async (productId, updateData) => {
+              await this.model.updateProduct(productId, updateData);
+              this.view.showToast({ type: 'success', message: 'Product updated successfully.' });
+              await this.loadWorkspaceProducts(this.selectedProductsWorkspaceId);
+            },
+            onDelete: async (productId) => {
+              await this.model.deleteProduct(productId);
+              this.view.showToast({ type: 'success', message: 'Product deleted.' });
+              await this.loadWorkspaceProducts(this.selectedProductsWorkspaceId);
+            },
+            onAddAttribute: async (productId, attributeName) => {
+              const updated = await this.model.addProductAttribute(productId, { attribute: attributeName });
+              this.view.showToast({ type: 'success', message: `Attribute "${attributeName}" added.` });
+              await this.loadWorkspaceProducts(this.selectedProductsWorkspaceId);
+              return updated;
+            },
+            onEditAttribute: async (productId, oldAttribute, newAttribute) => {
+              const updated = await this.model.updateProductAttribute(productId, oldAttribute, newAttribute);
+              this.view.showToast({ type: 'success', message: `Attribute updated to "${newAttribute}".` });
+              await this.loadWorkspaceProducts(this.selectedProductsWorkspaceId);
+              return updated;
+            },
+            onDeleteAttribute: async (productId, attributeName) => {
+              const updated = await this.model.deleteProductAttribute(productId, attributeName);
+              this.view.showToast({ type: 'success', message: `Attribute "${attributeName}" removed.` });
+              await this.loadWorkspaceProducts(this.selectedProductsWorkspaceId);
+              return updated;
+            }
+          });
+        },
+        onAddAttribute: async (productId, attributeName) => {
+          const updated = await this.model.addProductAttribute(productId, { attribute: attributeName });
+          this.view.showToast({ type: 'success', message: `Attribute "${attributeName}" added.` });
+          await this.loadWorkspaceProducts(this.selectedProductsWorkspaceId);
+          return updated;
+        },
+        onEditAttribute: async (productId, oldAttribute, newAttribute) => {
+          const updated = await this.model.updateProductAttribute(productId, oldAttribute, newAttribute);
+          this.view.showToast({ type: 'success', message: `Attribute updated to "${newAttribute}".` });
+          await this.loadWorkspaceProducts(this.selectedProductsWorkspaceId);
+          return updated;
+        },
+        onDeleteAttribute: async (productId, attributeName) => {
+          const updated = await this.model.deleteProductAttribute(productId, attributeName);
+          this.view.showToast({ type: 'success', message: `Attribute "${attributeName}" removed.` });
+          await this.loadWorkspaceProducts(this.selectedProductsWorkspaceId);
+          return updated;
+        }
+      };
+
+      if (typeof this.view.renderProductsCatalog === 'function') {
+        this.view.renderProductsCatalog(products, handlers);
+      } else {
+        this.view.renderProductsGrid(products, handlers.onProductClick);
+      }
     } catch (err) {
       console.error(`DashboardController: Error loading products for workspace ${workspaceId}:`, err);
       const serverMessage = err.serverMessage || err.message || "Failed to load products";

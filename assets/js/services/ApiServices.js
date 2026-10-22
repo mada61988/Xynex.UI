@@ -869,4 +869,124 @@ export class ApiService {
 
     return await response.json().catch(() => ({ success: true }));
   }
+
+  /**
+   * Adds an attribute (or multiple) to a product
+   * POST /products/:id/attributes
+   */
+  async addProductAttribute(productId, attributeData) {
+    if (!productId) {
+      throw new Error("productId is required to add product attribute");
+    }
+    const headers = await this.getHeaders();
+    const payload = typeof attributeData === 'string' ? { attribute: attributeData } : attributeData;
+    const response = await fetch(`${CONFIG.API_BASE_URL}/products/${encodeURIComponent(productId)}/attributes`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      let serverMessage = response.statusText;
+      try {
+        const errorData = await response.json();
+        serverMessage = errorData.message || errorData.error || errorData.detail || JSON.stringify(errorData);
+      } catch (e) {
+        try {
+          const text = await response.text();
+          if (text) serverMessage = text;
+        } catch (_) {}
+      }
+
+      const err = new Error(serverMessage || `Failed to add attribute: ${response.statusText}`);
+      err.status = response.status;
+      err.serverMessage = serverMessage;
+      throw err;
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Updates an existing attribute of a product
+   * PUT /products/:id/attributes/:attribute or PUT /products/:id/attributes
+   */
+  async updateProductAttribute(productId, oldAttribute, newAttribute) {
+    if (!productId) {
+      throw new Error("productId is required to update product attribute");
+    }
+    const headers = await this.getHeaders();
+    const url = oldAttribute 
+      ? `${CONFIG.API_BASE_URL}/products/${encodeURIComponent(productId)}/attributes/${encodeURIComponent(oldAttribute)}`
+      : `${CONFIG.API_BASE_URL}/products/${encodeURIComponent(productId)}/attributes`;
+
+    const payload = {
+      oldAttribute,
+      newAttribute: typeof newAttribute === 'string' ? newAttribute : (newAttribute?.newAttribute || newAttribute?.value)
+    };
+
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      let serverMessage = response.statusText;
+      try {
+        const errorData = await response.json();
+        serverMessage = errorData.message || errorData.error || errorData.detail || JSON.stringify(errorData);
+      } catch (e) {
+        try {
+          const text = await response.text();
+          if (text) serverMessage = text;
+        } catch (_) {}
+      }
+
+      const err = new Error(serverMessage || `Failed to update attribute: ${response.statusText}`);
+      err.status = response.status;
+      err.serverMessage = serverMessage;
+      throw err;
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Deletes an attribute from a product
+   * DELETE /products/:id/attributes/:attribute
+   */
+  async deleteProductAttribute(productId, attribute) {
+    if (!productId) {
+      throw new Error("productId is required to delete product attribute");
+    }
+    if (!attribute) {
+      throw new Error("attribute is required to delete product attribute");
+    }
+    const headers = await this.getHeaders();
+    const response = await fetch(`${CONFIG.API_BASE_URL}/products/${encodeURIComponent(productId)}/attributes/${encodeURIComponent(attribute)}`, {
+      method: 'DELETE',
+      headers
+    });
+
+    if (!response.ok) {
+      let serverMessage = response.statusText;
+      try {
+        const errorData = await response.json();
+        serverMessage = errorData.message || errorData.error || errorData.detail || JSON.stringify(errorData);
+      } catch (e) {
+        try {
+          const text = await response.text();
+          if (text) serverMessage = text;
+        } catch (_) {}
+      }
+
+      const err = new Error(serverMessage || `Failed to delete attribute: ${response.statusText}`);
+      err.status = response.status;
+      err.serverMessage = serverMessage;
+      throw err;
+    }
+
+    return await response.json();
+  }
 }

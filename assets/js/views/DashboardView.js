@@ -3291,7 +3291,7 @@ export class DashboardView {
     });
   }
 
-  openProductDetailsModal(product, { onEdit, onSave }) {
+  openProductDetailsModal(product, { onEdit, onSave, onDelete }) {
     if (!this.modalContainer) {
       this.modalContainer = document.getElementById('modal-container');
     }
@@ -3490,13 +3490,19 @@ export class DashboardView {
 
               <div id="product-edit-feedback" class="hidden text-xs py-2 px-3 rounded-lg"></div>
 
-              <div class="pt-4 border-t border-zinc-800 flex items-center justify-end gap-3">
-                <button type="button" id="cancel-edit-mode-btn" class="border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 px-4 py-2.5 rounded-xl text-xs font-medium transition cursor-pointer">
-                  Cancel
+              <div class="pt-4 border-t border-zinc-800 flex items-center justify-between">
+                <button type="button" id="delete-product-btn" class="border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 px-4 py-2.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer">
+                  <i class="fa-solid fa-trash text-xs"></i>
+                  <span>Delete Product</span>
                 </button>
-                <button type="submit" id="save-product-changes-btn" class="bg-white hover:bg-zinc-200 text-black px-5 py-2.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-md">
-                  <span>Save Changes</span>
-                </button>
+                <div class="flex items-center gap-3">
+                  <button type="button" id="cancel-edit-mode-btn" class="border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 px-4 py-2.5 rounded-xl text-xs font-medium transition cursor-pointer">
+                    Cancel
+                  </button>
+                  <button type="submit" id="save-product-changes-btn" class="bg-white hover:bg-zinc-200 text-black px-5 py-2.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-md">
+                    <span>Save Changes</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -3510,6 +3516,7 @@ export class DashboardView {
     const editMode = document.getElementById('product-modal-edit-mode');
     const startEditBtn = document.getElementById('start-edit-product-btn');
     const cancelEditBtn = document.getElementById('cancel-edit-mode-btn');
+    const deleteBtn = document.getElementById('delete-product-btn');
     const closeBtn = document.getElementById('close-product-modal-btn');
     const cancelModalBtn = document.getElementById('cancel-product-modal-btn');
     const backdrop = document.getElementById('product-modal-backdrop');
@@ -3568,6 +3575,29 @@ export class DashboardView {
           if (fb) {
             fb.className = "text-xs py-2 px-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 block";
             fb.textContent = err.serverMessage || err.message || "Failed to update product.";
+          }
+        }
+      };
+    }
+
+    if (deleteBtn && onDelete) {
+      deleteBtn.onclick = async () => {
+        const confirmDelete = window.confirm(`Are you sure you want to delete "${product.name}"? This action cannot be undone.`);
+        if (!confirmDelete) return;
+
+        deleteBtn.disabled = true;
+        deleteBtn.innerHTML = `<svg class="animate-spin h-3.5 w-3.5 inline text-rose-400 mr-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Deleting...`;
+
+        try {
+          await onDelete(product.id);
+          this.closeProductDetailsModal();
+        } catch (err) {
+          deleteBtn.disabled = false;
+          deleteBtn.innerHTML = `<i class="fa-solid fa-trash text-xs"></i><span>Delete Product</span>`;
+          const fb = document.getElementById('product-edit-feedback');
+          if (fb) {
+            fb.className = "text-xs py-2 px-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 block";
+            fb.textContent = err.serverMessage || err.message || "Failed to delete product.";
           }
         }
       };

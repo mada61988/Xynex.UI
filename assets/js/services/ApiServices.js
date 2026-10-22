@@ -838,4 +838,35 @@ export class ApiService {
 
     return await response.json();
   }
+
+  async deleteProduct(productId) {
+    if (!productId) {
+      throw new Error("productId is required to delete product");
+    }
+    const headers = await this.getHeaders();
+    const response = await fetch(`${CONFIG.API_BASE_URL}/products/${encodeURIComponent(productId)}`, {
+      method: 'DELETE',
+      headers
+    });
+
+    if (!response.ok) {
+      let serverMessage = response.statusText;
+      try {
+        const errorData = await response.json();
+        serverMessage = errorData.message || errorData.error || errorData.detail || JSON.stringify(errorData);
+      } catch (e) {
+        try {
+          const text = await response.text();
+          if (text) serverMessage = text;
+        } catch (_) {}
+      }
+
+      const err = new Error(serverMessage || `Failed to delete product: ${response.statusText}`);
+      err.status = response.status;
+      err.serverMessage = serverMessage;
+      throw err;
+    }
+
+    return await response.json().catch(() => ({ success: true }));
+  }
 }

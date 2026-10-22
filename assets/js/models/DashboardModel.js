@@ -583,4 +583,16 @@ export class DashboardModel {
     const data = await this.apiService.updateProduct(productId, productData);
     return data;
   }
+
+  /**
+   * Deletes a product using DELETE /products/:id
+   */
+  async deleteProduct(productId) {
+    if (!productId) {
+      const err = new Error("productId is required");
+      throw err;
+    }
+    const data = await this.apiService.deleteProduct(productId);
+    return data;
+  }
 }

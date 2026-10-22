@@ -447,6 +447,11 @@ export class DashboardController {
             await this.model.updateProduct(productId, updateData);
             // Refresh products for this workspace after save
             await this.loadWorkspaceProducts(this.selectedProductsWorkspaceId);
+          },
+          onDelete: async (productId) => {
+            await this.model.deleteProduct(productId);
+            // Refresh products for this workspace after delete
+            await this.loadWorkspaceProducts(this.selectedProductsWorkspaceId);
           }
         });
       });

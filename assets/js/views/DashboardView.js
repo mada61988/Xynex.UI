@@ -60,6 +60,11 @@ export class DashboardView {
     this.cachedProducts = [];
     this.cachedProductsHandlers = null;
 
+    // Integrations, Analytics & Settings sections
+    this.integrationsSection = document.getElementById('section-integrations');
+    this.analyticsSection = document.getElementById('section-analytics');
+    this.settingsSection = document.getElementById('section-settings');
+
     // Callbacks for role editing
     this.onEditRoleClick = null;
     this.onSaveRoleClick = null;
@@ -572,6 +577,9 @@ export class DashboardView {
     if (this.createChannelSection) this.createChannelSection.classList.add('hidden');
     if (this.conversationsSection) this.conversationsSection.classList.add('hidden');
     if (this.productsSection) this.productsSection.classList.add('hidden');
+    if (this.integrationsSection) this.integrationsSection.classList.add('hidden');
+    if (this.analyticsSection) this.analyticsSection.classList.add('hidden');
+    if (this.settingsSection) this.settingsSection.classList.add('hidden');
 
     const isOverview = (sectionName === 'overview' || !sectionName || sectionName === '');
 
@@ -605,6 +613,21 @@ export class DashboardView {
       ]);
     } else if (sectionName === 'create-channel') {
       if (this.createChannelSection) this.createChannelSection.classList.remove('hidden');
+    } else if (sectionName === 'integrations') {
+      if (this.integrationsSection) this.integrationsSection.classList.remove('hidden');
+      this.renderHeaderBreadcrumbs([
+        { label: 'Integrations', icon: '<i class="fa-solid fa-plug-circle-bolt text-xs text-zinc-400"></i>' }
+      ]);
+    } else if (sectionName === 'analytics') {
+      if (this.analyticsSection) this.analyticsSection.classList.remove('hidden');
+      this.renderHeaderBreadcrumbs([
+        { label: 'Analytics & Logs', icon: '<i class="fa-solid fa-chart-line text-xs text-zinc-400"></i>' }
+      ]);
+    } else if (sectionName === 'settings') {
+      if (this.settingsSection) this.settingsSection.classList.remove('hidden');
+      this.renderHeaderBreadcrumbs([
+        { label: 'Settings', icon: '<i class="fa-solid fa-sliders text-xs text-zinc-400"></i>' }
+      ]);
     } else {
       if (this.overviewSection) this.overviewSection.classList.remove('hidden');
       this.renderHeaderBreadcrumbs([]);

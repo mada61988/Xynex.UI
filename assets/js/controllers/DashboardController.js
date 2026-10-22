@@ -429,6 +429,12 @@ export class DashboardController {
       if (this.chatsController) {
         await this.chatsController.init();
       }
+    } else if (target === 'integrations') {
+      this.view.showSection('integrations');
+    } else if (target === 'analytics') {
+      this.view.showSection('analytics');
+    } else if (target === 'settings') {
+      this.view.showSection('settings');
     } else {
       // Default to overview section
       this.view.showSection('overview');

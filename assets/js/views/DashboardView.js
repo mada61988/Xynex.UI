@@ -104,6 +104,17 @@ export class DashboardView {
     }
   }
 
+  flashUpdate(elementOrId) {
+    const el = typeof elementOrId === 'string' ? document.getElementById(elementOrId) : elementOrId;
+    if (!el) return;
+    el.classList.remove('data-updated-pulse');
+    void el.offsetWidth; // Trigger reflow to restart animation
+    el.classList.add('data-updated-pulse');
+    setTimeout(() => {
+      if (el) el.classList.remove('data-updated-pulse');
+    }, 1500);
+  }
+
   bindCreateWorkspace({ onSubmit, onCancel }) {
     const form = document.getElementById('form-create-workspace');
     const nameInput = document.getElementById('create-workspace-name');
@@ -750,7 +761,7 @@ export class DashboardView {
     this.setChannelsLoading();
   }
 
-  renderChannelsMetric({ totalChannels, activeChannels, percentageOperational, total, active, percentage }) {
+  renderChannelsMetric({ totalChannels, activeChannels, percentageOperational, total, active, percentage }, animate = false) {
     const card = document.getElementById('card-metric-channels') || document.getElementById('card-metric-profiles');
     const icon = document.getElementById('icon-metric-channels') || document.getElementById('icon-metric-profiles');
     if (card) card.classList.remove('border-rose-500/30');
@@ -784,6 +795,10 @@ export class DashboardView {
 
     if (elSubtext) {
       elSubtext.textContent = `· ${act} Active of ${tot}`;
+    }
+
+    if (animate && card) {
+      this.flashUpdate(card);
     }
   }
 
@@ -969,7 +984,7 @@ export class DashboardView {
     }
   }
 
-  renderMessagesCount(count) {
+  renderMessagesCount(count, animate = false) {
     const card = document.getElementById('card-metric-messages');
     const icon = document.getElementById('icon-metric-messages');
     if (card) card.classList.remove('border-rose-500/30');
@@ -986,6 +1001,10 @@ export class DashboardView {
     if (elTrend) {
       elTrend.className = "text-emerald-400 font-semibold flex items-center gap-1";
       elTrend.innerHTML = `<i class="fa-solid fa-arrow-trend-up text-[10px]"></i> Live Synced`;
+    }
+
+    if (animate && card) {
+      this.flashUpdate(card);
     }
   }
 
@@ -1063,7 +1082,7 @@ export class DashboardView {
     }
   }
 
-  renderDmToCheckout(percentage) {
+  renderDmToCheckout(percentage, animate = false) {
     const card = document.getElementById('card-metric-conversion');
     const icon = document.getElementById('icon-metric-conversion');
     if (card) card.classList.remove('border-rose-500/30');
@@ -1087,6 +1106,10 @@ export class DashboardView {
 
     if (elSubtext) {
       elSubtext.textContent = '· Checkout conversion';
+    }
+
+    if (animate && card) {
+      this.flashUpdate(card);
     }
   }
 
@@ -1267,7 +1290,7 @@ export class DashboardView {
     }
   }
 
-  renderPlacedOrders(orders) {
+  renderPlacedOrders(orders, animate = false) {
     const statusBadge = document.getElementById('orders-status-badge');
     const feed = document.getElementById('orders-feed-container');
     const revenueEl = document.getElementById('orders-total-revenue');
@@ -1349,6 +1372,10 @@ export class DashboardView {
           </div>
         `;
       }).join('');
+    }
+
+    if (animate) {
+      this.flashUpdate('card-placed-orders');
     }
   }
 
@@ -1534,7 +1561,7 @@ export class DashboardView {
     this.onSaveRoleClick = onSave;
   }
 
-  renderUsersTable(users) {
+  renderUsersTable(users, animate = false) {
     if (!this.usersTableContainer) return;
 
     if (this.usersCountBadge) {
@@ -1989,7 +2016,7 @@ export class DashboardView {
     return name.slice(0, 2).toUpperCase();
   }
 
-  renderWorkspacesCards(workspaces, onSelectWorkspace = null, onOpenDetail = null) {
+  renderWorkspacesCards(workspaces, onSelectWorkspace = null, onOpenDetail = null, animate = false) {
     if (!this.workspacesCardsContainer) return;
 
     if (this.workspacesCountBadge) {
@@ -2079,6 +2106,10 @@ export class DashboardView {
         }
       });
     });
+
+    if (animate && this.workspacesCardsContainer) {
+      this.flashUpdate(this.workspacesCardsContainer);
+    }
   }
 
   renderWorkspaceDetailView(workspace, channels, metrics = {}, { onBackToWorkspaces, onConfigureChannel, onOpenEditWorkspace, onOpenCreateChannel }) {
@@ -3812,7 +3843,7 @@ export class DashboardView {
   /**
    * Universal Catalog Renderer routing to active view mode (Table or Grid)
    */
-  renderProductsCatalog(products, handlers = {}) {
+  renderProductsCatalog(products, handlers = {}, animate = false) {
     this.cachedProducts = products;
     this.cachedProductsHandlers = handlers;
 
@@ -3825,6 +3856,10 @@ export class DashboardView {
       this.renderProductsGrid(products, handlers);
     } else {
       this.renderProductsTable(products, handlers);
+    }
+
+    if (animate && this.productsGridContainer) {
+      this.flashUpdate(this.productsGridContainer);
     }
   }
 

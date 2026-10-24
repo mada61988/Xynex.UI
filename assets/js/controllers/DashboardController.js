@@ -1,4 +1,5 @@
 import { ChatsController } from './ChatsController.js';
+import { pollingService, POLLING_INTERVALS } from '../services/PollingService.js';
 
 export class DashboardController {
   constructor(model, view, authModel = null) {
@@ -12,6 +13,16 @@ export class DashboardController {
     this.cachedOverallData = null;
     this.selectedProductsWorkspaceId = null;
     this.chatsController = new ChatsController(this.authModel, this.model);
+
+    // Cache state to eliminate duplicate loading spinners
+    this.hasLoadedOverview = false;
+    this.hasLoadedUsers = false;
+    this.cachedUsers = null;
+    this.hasLoadedWorkspaces = false;
+    this.cachedAllWorkspaces = null;
+    this.productsCache = new Map(); // workspaceId -> products array
+    this.cachedProductsHandlers = null;
+    this.pollingRegistered = false;
   }
 
   async init() {
@@ -87,10 +98,11 @@ export class DashboardController {
         this.loadTotalSales(),
         this.loadPlacedOrders()
       ]);
+      this.hasLoadedOverview = true;
     } finally {
       this.view.hidePageLoading();
     }
-    this.startMessagesPolling();
+    this.setupBackgroundPolling();
 
 
 // 7. Re-fetch ONLY if the authenticated user actually changes
@@ -141,7 +153,10 @@ export class DashboardController {
     }
   }
 
-  startMessagesPolling() {
+  setupBackgroundPolling() {
+    if (this.pollingRegistered) return;
+    this.pollingRegistered = true;
+
     // 1-second ticker to update "last synced X seconds"
     if (!this.messagesTickerInterval) {
       this.messagesTickerInterval = setInterval(() => {
@@ -152,16 +167,143 @@ export class DashboardController {
       }, 1000);
     }
 
-    // 2-minute polling interval (120,000 ms)
-    if (!this.messagesPollInterval) {
-      this.messagesPollInterval = setInterval(async () => {
+    // Task 1: Overview Live Messages Count (Priority 2: 8 seconds)
+    pollingService.register('overview_messages', {
+      section: 'overview',
+      interval: POLLING_INTERVALS.MESSAGES_COUNT,
+      fetchFn: async () => {
+        const clerkId = this.authModel?.user?.id || window.Clerk?.user?.id;
+        if (!clerkId) return null;
         if (this.currentSelectedWorkspaceId && this.currentSelectedWorkspaceId !== 'all') {
-          await this.loadWorkspaceMessagesCount(this.currentSelectedWorkspaceId, true);
-        } else {
-          await this.loadMessagesCount(true);
+          return await this.model.fetchWorkspaceMessagesCount(this.currentSelectedWorkspaceId);
         }
-      }, 120000);
-    }
+        return await this.model.fetchMessagesCount(clerkId);
+      },
+      onUpdate: (count, hasChanged) => {
+        if (count !== null && count !== undefined) {
+          this.view.renderMessagesCount(count, hasChanged);
+          this.lastMessagesSyncedTime = Date.now();
+          this.view.updateMessagesLastSynced(0);
+        }
+      }
+    });
+
+    // Task 2: Overview Placed Orders (Priority 2: 12 seconds)
+    pollingService.register('overview_orders', {
+      section: 'overview',
+      interval: POLLING_INTERVALS.PLACED_ORDERS,
+      fetchFn: async () => {
+        const clerkId = this.authModel?.user?.id || window.Clerk?.user?.id;
+        if (!clerkId) return null;
+        return await this.model.fetchPlacedOrders({
+          clerkId,
+          workspaceId: this.currentSelectedWorkspaceId
+        });
+      },
+      onUpdate: (orders, hasChanged) => {
+        if (Array.isArray(orders)) {
+          this.view.renderPlacedOrders(orders, hasChanged);
+        }
+      }
+    });
+
+    // Task 3: Overview Sales & Conversion (Priority 2: 15 seconds)
+    pollingService.register('overview_sales', {
+      section: 'overview',
+      interval: POLLING_INTERVALS.CONVERSION_SALES,
+      fetchFn: async () => {
+        const clerkId = this.authModel?.user?.id || window.Clerk?.user?.id;
+        if (!clerkId) return null;
+        const [sales, dm] = await Promise.allSettled([
+          this.model.fetchTotalSales({ clerkId, workspaceId: this.currentSelectedWorkspaceId }),
+          this.model.fetchDmToCheckout({ clerkId, workspaceId: this.currentSelectedWorkspaceId })
+        ]);
+        return {
+          sales: sales.status === 'fulfilled' ? sales.value : null,
+          dm: dm.status === 'fulfilled' ? dm.value : null
+        };
+      },
+      onUpdate: (data, hasChanged) => {
+        if (data?.sales) this.view.renderTotalSales(data.sales, hasChanged);
+        if (data?.dm !== null && data?.dm !== undefined) this.view.renderDmToCheckout(data.dm, hasChanged);
+      }
+    });
+
+    // Task 4: Overview Channels Status (Priority 3: 25 seconds)
+    pollingService.register('overview_channels', {
+      section: 'overview',
+      interval: POLLING_INTERVALS.CHANNELS_STATUS,
+      fetchFn: async () => {
+        const clerkId = this.authModel?.user?.id || window.Clerk?.user?.id;
+        if (!clerkId) return null;
+        if (this.currentSelectedWorkspaceId && this.currentSelectedWorkspaceId !== 'all') {
+          return await this.model.fetchWorkspaceChannels(this.currentSelectedWorkspaceId);
+        }
+        return await this.model.fetchUserWorkspaces(clerkId);
+      },
+      onUpdate: (channelData, hasChanged) => {
+        if (channelData) {
+          if (this.currentSelectedWorkspaceId && this.currentSelectedWorkspaceId !== 'all') {
+            this.view.renderChannelsMetric(channelData, hasChanged);
+          } else {
+            this.cachedOverallData = channelData;
+            this.view.renderChannelsMetric({
+              totalChannels: channelData.totalChannels,
+              activeChannels: channelData.activeChannels,
+              percentageOperational: channelData.percentageOperational
+            }, hasChanged);
+          }
+        }
+      }
+    });
+
+    // Task 5: Users Table Directory (Priority 4: 45 seconds)
+    pollingService.register('users_table', {
+      section: 'users',
+      interval: POLLING_INTERVALS.USERS_DIRECTORY,
+      fetchFn: async () => {
+        return await this.model.fetchUsers();
+      },
+      onUpdate: (users, hasChanged) => {
+        if (Array.isArray(users)) {
+          this.cachedUsers = users;
+          this.view.renderUsersTable(users, hasChanged);
+        }
+      }
+    });
+
+    // Task 6: Workspaces Directory (Priority 4: 60 seconds)
+    pollingService.register('workspaces_cards', {
+      section: 'workspaces',
+      interval: POLLING_INTERVALS.WORKSPACES_LIST,
+      fetchFn: async () => {
+        return await this.model.fetchAllWorkspaces();
+      },
+      onUpdate: (workspaces, hasChanged) => {
+        if (Array.isArray(workspaces)) {
+          this.cachedAllWorkspaces = workspaces;
+          this.view.renderWorkspacesCards(workspaces, async (wsId) => {
+            await this.openWorkspaceDetail(wsId);
+          }, null, hasChanged);
+        }
+      }
+    });
+
+    // Task 7: Products Catalog (Priority 3: 35 seconds)
+    pollingService.register('products_grid', {
+      section: 'products',
+      interval: POLLING_INTERVALS.PRODUCTS_CATALOG,
+      fetchFn: async () => {
+        if (!this.selectedProductsWorkspaceId) return null;
+        return await this.model.fetchWorkspaceProducts(this.selectedProductsWorkspaceId);
+      },
+      onUpdate: (products, hasChanged) => {
+        if (Array.isArray(products) && this.selectedProductsWorkspaceId) {
+          this.productsCache.set(this.selectedProductsWorkspaceId, products);
+          this.view.renderProductsCatalog(products, this.cachedProductsHandlers || {}, hasChanged);
+        }
+      }
+    });
   }
 
   async loadMessagesCount(isBackground = false) {
@@ -358,39 +500,62 @@ export class DashboardController {
   }
 
   async handleNavigation(target) {
-    if (target === 'users') {
+    const section = target || 'overview';
+    pollingService.setActiveSection(section);
+
+    if (section === 'users') {
       this.view.showSection('users');
-      this.view.renderUsersLoading();
 
-      try {
-        const users = await this.model.fetchUsers();
-        this.view.renderUsersTable(users);
-      } catch (err) {
-        console.error("DashboardController: Error fetching users:", err);
-        const serverMessage = err.serverMessage || err.message || "Failed to communicate with server.";
-        const status = err.status || (String(serverMessage).toLowerCase().includes('unauthorized') ? 401 : 403);
-        this.view.renderUsersError({
-          status: status,
-          message: serverMessage
-        }, () => this.handleNavigation('users'));
+      // Loader visible ONLY on first entry when no data exists!
+      if (!this.cachedUsers || !this.hasLoadedUsers) {
+        this.view.renderUsersLoading();
+        try {
+          const users = await this.model.fetchUsers();
+          this.cachedUsers = users;
+          this.hasLoadedUsers = true;
+          this.view.renderUsersTable(users);
+          pollingService.seedTaskData('users_table', users);
+        } catch (err) {
+          console.error("DashboardController: Error fetching users:", err);
+          const serverMessage = err.serverMessage || err.message || "Failed to communicate with server.";
+          const status = err.status || (String(serverMessage).toLowerCase().includes('unauthorized') ? 401 : 403);
+          this.view.renderUsersError({
+            status: status,
+            message: serverMessage
+          }, () => this.handleNavigation('users'));
+        }
+      } else {
+        // Cached data exists: render immediately with ZERO loader
+        this.view.renderUsersTable(this.cachedUsers);
       }
-    } else if (target === 'workspaces') {
+    } else if (section === 'workspaces') {
       this.view.showSection('workspaces');
-      this.view.renderWorkspacesCardsLoading();
 
-      try {
-        const workspaces = await this.model.fetchAllWorkspaces();
-        this.view.renderWorkspacesCards(workspaces, async (workspaceId) => {
+      // Loader visible ONLY on first entry when no data exists!
+      if (!this.cachedAllWorkspaces || !this.hasLoadedWorkspaces) {
+        this.view.renderWorkspacesCardsLoading();
+        try {
+          const workspaces = await this.model.fetchAllWorkspaces();
+          this.cachedAllWorkspaces = workspaces;
+          this.hasLoadedWorkspaces = true;
+          this.view.renderWorkspacesCards(workspaces, async (workspaceId) => {
+            await this.openWorkspaceDetail(workspaceId);
+          });
+          pollingService.seedTaskData('workspaces_cards', workspaces);
+        } catch (err) {
+          console.error("DashboardController: Error fetching workspaces:", err);
+          const serverMessage = err.serverMessage || err.message || "Failed to communicate with server.";
+          this.view.renderWorkspacesCardsError(serverMessage, () => this.handleNavigation('workspaces'));
+        }
+      } else {
+        // Cached data exists: render immediately with ZERO loader
+        this.view.renderWorkspacesCards(this.cachedAllWorkspaces, async (workspaceId) => {
           await this.openWorkspaceDetail(workspaceId);
         });
-      } catch (err) {
-        console.error("DashboardController: Error fetching workspaces:", err);
-        const serverMessage = err.serverMessage || err.message || "Failed to communicate with server.";
-        this.view.renderWorkspacesCardsError(serverMessage, () => this.handleNavigation('workspaces'));
       }
-    } else if (target === 'create-workspace') {
+    } else if (section === 'create-workspace') {
       this.view.showSection('create-workspace');
-    } else if (target === 'products') {
+    } else if (section === 'products') {
       this.view.showSection('products');
 
       const clerkId = this.authModel?.user?.id || window.Clerk?.user?.id;
@@ -420,24 +585,45 @@ export class DashboardController {
       });
 
       if (this.selectedProductsWorkspaceId) {
-        await this.loadWorkspaceProducts(this.selectedProductsWorkspaceId);
+        // If cached for this workspace, render with zero loader!
+        if (this.productsCache.has(this.selectedProductsWorkspaceId)) {
+          const cached = this.productsCache.get(this.selectedProductsWorkspaceId);
+          this.view.renderProductsCatalog(cached, this.cachedProductsHandlers || {});
+        } else {
+          await this.loadWorkspaceProducts(this.selectedProductsWorkspaceId);
+        }
       } else if (workspaces.length === 0) {
         this.view.renderProductsError("No workspaces found for this user.");
       }
-    } else if (target === 'conversations' || target === 'chats') {
+    } else if (section === 'conversations' || section === 'chats') {
       this.view.showSection('conversations');
       if (this.chatsController) {
         await this.chatsController.init();
       }
-    } else if (target === 'integrations') {
+    } else if (section === 'integrations') {
       this.view.showSection('integrations');
-    } else if (target === 'analytics') {
+    } else if (section === 'analytics') {
       this.view.showSection('analytics');
-    } else if (target === 'settings') {
+    } else if (section === 'settings') {
       this.view.showSection('settings');
     } else {
       // Default to overview section
       this.view.showSection('overview');
+      if (!this.hasLoadedOverview) {
+        this.view.showPageLoading("Initializing dashboard data...");
+        try {
+          await Promise.allSettled([
+            this.loadMessagesCount(),
+            this.loadProfilesMetric(),
+            this.loadDmToCheckout(),
+            this.loadTotalSales(),
+            this.loadPlacedOrders()
+          ]);
+          this.hasLoadedOverview = true;
+        } finally {
+          this.view.hidePageLoading();
+        }
+      }
     }
   }
 
@@ -461,13 +647,16 @@ export class DashboardController {
     });
   }
 
-  async loadWorkspaceProducts(workspaceId) {
+  async loadWorkspaceProducts(workspaceId, isBackground = false) {
     if (!workspaceId) return;
     this.selectedProductsWorkspaceId = workspaceId;
-    this.view.renderProductsLoading();
+    if (!isBackground) {
+      this.view.renderProductsLoading();
+    }
 
     try {
       const products = await this.model.fetchWorkspaceProducts(workspaceId);
+      this.productsCache.set(workspaceId, products);
 
       const handlers = {
         onAddProduct: () => this.handleOpenCreateProduct(),

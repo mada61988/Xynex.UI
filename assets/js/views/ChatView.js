@@ -468,7 +468,7 @@ export class ChatView {
     `;
   }
 
-  renderActiveChat(chat, messages = null) {
+  renderActiveChat(chat, messages = null, cachedOrders = null) {
     if (!this.activeChatContainer) return;
 
     const heading = this._escape(chat.userName || chat.user_name || chat.title || 'Customer');
@@ -629,7 +629,7 @@ export class ChatView {
 
     const contextHtml = `
       <!-- Active Order State -->
-      <div>
+      <div id="active-cart-card">
         <h3 class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-3">Active Order State</h3>
         <div class="bg-[#111114] border border-zinc-800 rounded-2xl p-4 space-y-3 shadow-sm">
           <div class="flex justify-between items-center">
@@ -707,6 +707,10 @@ export class ChatView {
     }
     if (this.mobileContextContent) {
       this.mobileContextContent.innerHTML = contextHtml;
+    }
+
+    if (Array.isArray(cachedOrders)) {
+      this.renderUserOrders(cachedOrders);
     }
 
     // Automatically scroll to the bottom of the conversation stream (most recent messages)
@@ -1148,5 +1152,103 @@ export class ChatView {
     }
     document.addEventListener('click', onOrderClick);
   }
+
+  flashUpdate(elementOrId) {
+    const el = typeof elementOrId === 'string' ? document.getElementById(elementOrId) : elementOrId;
+    if (!el) return;
+    el.classList.remove('data-updated-pulse');
+    void el.offsetWidth; // Trigger reflow
+    el.classList.add('data-updated-pulse');
+    setTimeout(() => {
+      if (el) el.classList.remove('data-updated-pulse');
+    }, 1500);
+  }
+
+  appendNewMessages(newMessages, chat) {
+    const stream = document.getElementById('active-chat-stream');
+    if (!stream || !Array.isArray(newMessages) || newMessages.length === 0) return;
+
+    newMessages.forEach(msg => {
+      const bubbleHtml = this._buildMessageBubbleHtml(msg, chat);
+      const container = document.createElement('div');
+      container.className = 'data-updated-fade';
+      container.innerHTML = bubbleHtml;
+      stream.appendChild(container);
+    });
+
+    this.scrollToBottom();
+  }
+
+  updateThreadCardSnippet(chatId, snippet, timestamp, hasChanged = false) {
+    const card = document.querySelector(`[data-chat-id="${chatId}"]`);
+    if (!card) return;
+
+    const snippetEl = card.querySelector('.chat-snippet-text') || card.querySelector('p');
+    if (snippetEl && snippet) {
+      snippetEl.textContent = snippet;
+    }
+
+    const timeEl = card.querySelector('.chat-timestamp') || card.querySelector('span.text-zinc-500');
+    if (timeEl && timestamp) {
+      timeEl.textContent = this.formatRelativeTime(timestamp);
+    }
+
+    if (hasChanged) {
+      this.flashUpdate(card);
+    }
+  }
+
+  updateActiveCart(chat, animate = false) {
+    const cartCard = document.getElementById('active-cart-card');
+    if (!cartCard) return;
+
+    const cartObj = chat.cart;
+    const cartId = cartObj?.id || chat.cartId || 557;
+    const currency = cartObj?.currencyCode || 'USD';
+    const totalPrice = cartObj?.totalPrice !== undefined ? Number(cartObj.totalPrice).toFixed(2) : '0.00';
+    const itemsCount = Array.isArray(cartObj?.items) ? cartObj.items.length : 0;
+
+    let pendingHtml = '';
+    if (chat.pendingSelections && chat.pendingSelections.productId) {
+      pendingHtml = `
+        <div class="border-t border-zinc-800/80 pt-2.5 mt-2.5 text-xs space-y-1">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
+            <i class="fa-solid fa-cart-arrow-down text-[9px]"></i> Pending Selection
+          </span>
+          <div class="text-zinc-300 font-mono text-[11px]">Product SKU #${this._escape(chat.pendingSelections.productId)}</div>
+        </div>
+      `;
+    }
+
+    cartCard.innerHTML = `
+      <h3 class="text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-3">Active Order State</h3>
+      <div class="bg-[#111114] border border-zinc-800 rounded-2xl p-4 space-y-3 shadow-sm">
+        <div class="flex justify-between items-center">
+          <span class="text-xs font-bold text-white">Cart #${this._escape(cartId)}</span>
+          <span class="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">ACTIVE</span>
+        </div>
+        <div class="border-t border-zinc-800/80 pt-2 flex justify-between text-xs">
+          <span class="text-zinc-400">Total Price</span>
+          <span class="font-mono text-white font-bold">${this._escape(currency)} ${this._escape(totalPrice)}</span>
+        </div>
+        <div class="flex justify-between text-[11px] text-zinc-500">
+          <span>Items in cart</span>
+          <span>${itemsCount} item(s)</span>
+        </div>
+        ${pendingHtml}
+        <div class="border-t border-zinc-800/80 pt-2.5 flex justify-end">
+          <button type="button" class="view-active-cart-btn text-[11px] text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 cursor-pointer" data-cart-id="${this._escape(cartId)}">
+            <span>Cart Details</span>
+            <i class="fa-solid fa-chevron-right text-[8px]"></i>
+          </button>
+        </div>
+      </div>
+    `;
+
+    if (animate) {
+      this.flashUpdate(cartCard);
+    }
+  }
 }
+
 

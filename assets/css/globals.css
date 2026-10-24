@@ -76,3 +76,39 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Subtle Data Update Animations for Polling */
+@keyframes dataUpdatePulse {
+  0% {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.45);
+    background-color: rgba(59, 130, 246, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    background-color: rgba(59, 130, 246, 0.03);
+  }
+  100% {
+    box-shadow: none;
+    background-color: transparent;
+  }
+}
+
+.data-updated-pulse {
+  animation: dataUpdatePulse 1.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+@keyframes dataUpdateFade {
+  0% {
+    opacity: 0.5;
+    transform: translateY(3px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.data-updated-fade {
+  animation: dataUpdateFade 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+

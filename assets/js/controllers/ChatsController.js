@@ -1,5 +1,6 @@
 import { ChatModel } from '../models/ChatModel.js';
 import { ChatView } from '../views/ChatView.js';
+import { pollingService, POLLING_INTERVALS } from '../services/PollingService.js';
 
 export class ChatsController {
   constructor(authModel = null, dashboardModel = null) {
@@ -12,6 +13,12 @@ export class ChatsController {
     this.currentChatOrders = [];
     this.observer = null;
     this.isMobileChatOpen = false;
+    this.pollingRegistered = false;
+
+    // Per-chat in-memory caching to eliminate loaders on return visits
+    this.chatDetailsCache = new Map(); // chatId -> full chat object (messages, cart, etc.)
+    this.chatOrdersCache = new Map();  // chatId -> customer orders array
+    this.loadedChatsSet = new Set();   // Set of chatIds that have been loaded once
   }
 
   async init() {
@@ -21,18 +28,215 @@ export class ChatsController {
       this.isInitialized = true;
     }
 
+    // 2. Register background polling tasks for conversations
+    if (!this.pollingRegistered) {
+      this.registerBackgroundPolling();
+      this.pollingRegistered = true;
+    }
+
     // Default to mobile list view if on smaller screens
     if (window.innerWidth < 768) {
       this.view.showMobileListView();
     }
 
-    // 2. Populate workspace options in filter dropdown and initial channel options
+    // 3. Populate workspace options in filter dropdown and initial channel options
     await this.loadWorkspaceFilterOptions();
 
-    // 3. Initial Load: fetch with workspaceId=all, channelId=all, limit=10, offset=0
+    // 4. Initial Load: Only display loader on the very first visit if chats are empty
     if (this.model.chats.length === 0) {
       await this.fetchInitialChats();
+    } else {
+      // Data already cached - render immediately with NO loader!
+      const filtered = this.model.getFilteredChats();
+      this.view.renderThreadCards(filtered, this.model.selectedChatId);
+      if (this.model.selectedChatId) {
+        const activeChat = this.model.getChatById(this.model.selectedChatId);
+        if (activeChat) {
+          this.view.renderActiveChat(activeChat, activeChat.messages);
+        }
+      }
     }
+  }
+
+  /**
+   * Registers silent background polling tasks for conversation threads and active messages
+   */
+  registerBackgroundPolling() {
+    // Task 1: Inbound Conversation Threads (Priority 1: 4 seconds)
+    pollingService.register('conversations_threads', {
+      section: ['conversations', 'chats'],
+      interval: 4000,
+      fetchFn: async () => {
+        try {
+          const rawData = await this.model.apiService.fetchChats({
+            workspaceId: this.model.currentWorkspaceId,
+            channelId: this.model.currentChannelId,
+            limit: 25,
+            offset: 0
+          });
+          return this.model.flattenChats(rawData);
+        } catch (err) {
+          console.warn('[ChatsController] Polling fetchChats failed:', err.message || err);
+          return null;
+        }
+      },
+      onUpdate: (freshChats) => {
+        if (Array.isArray(freshChats)) {
+          this.handlePolledChatsUpdate(freshChats);
+        }
+      }
+    });
+
+    // Task 2: Active Chat Messages, Cart & Customer Orders (Priority 1: 3 seconds)
+    pollingService.register('conversations_active_messages', {
+      section: ['conversations', 'chats'],
+      interval: POLLING_INTERVALS.CHAT_MESSAGES,
+      fetchFn: async () => {
+        if (!this.model.selectedChatId) return null;
+        const chatId = this.model.selectedChatId;
+        const chat = this.chatDetailsCache.get(chatId) || this.model.getChatById(chatId);
+        const senderId = chat?.senderId || (typeof chat?.sender_id === 'object' ? chat?.sender_id?.id : chat?.sender_id);
+
+        const [chatRes, ordersRes] = await Promise.allSettled([
+          this.model.fetchChatDetails(chatId),
+          senderId ? this.model.fetchOrdersBySender(senderId) : Promise.resolve([])
+        ]);
+
+        return {
+          chatId,
+          fullChat: chatRes.status === 'fulfilled' ? chatRes.value : null,
+          orders: ordersRes.status === 'fulfilled' && Array.isArray(ordersRes.value) ? ordersRes.value : null
+        };
+      },
+      onUpdate: (pollResult) => {
+        if (!pollResult || pollResult.chatId !== this.model.selectedChatId) return;
+        this.handlePolledActiveChatSync(pollResult);
+      }
+    });
+  }
+
+  handlePolledChatsUpdate(freshChats) {
+    if (!Array.isArray(freshChats) || freshChats.length === 0) return;
+
+    const currentChats = this.model.chats || [];
+    const currentMap = new Map(currentChats.map(c => [String(c.id), c]));
+    let hasNewChats = false;
+    let updatedChatId = null;
+    const newChatsList = [];
+
+    // 1. Identify brand-new chats and updated existing chats
+    freshChats.forEach(freshChat => {
+      const existing = currentMap.get(String(freshChat.id));
+      if (!existing) {
+        // Brand new chat from the backend!
+        hasNewChats = true;
+        updatedChatId = freshChat.id;
+        newChatsList.push(freshChat);
+      } else {
+        // Existing chat: update properties if snippet or timestamp changed
+        const oldSnippet = existing.lastMessageSnippet || existing.snippet;
+        const newSnippet = freshChat.lastMessageSnippet || freshChat.snippet;
+        const oldTs = existing.lastMessageTimestamp || existing.timestamp;
+        const newTs = freshChat.lastMessageTimestamp || freshChat.timestamp;
+
+        if (oldSnippet !== newSnippet || oldTs !== newTs) {
+          Object.assign(existing, freshChat);
+          updatedChatId = existing.id;
+          this.view.updateThreadCardSnippet(existing.id, newSnippet, newTs, true);
+        }
+      }
+    });
+
+    // 2. If new chats were detected, prepend them to the model and deduplicate
+    if (hasNewChats) {
+      this.model.chats = [...newChatsList, ...this.model.chats];
+      const seen = new Set();
+      this.model.chats = this.model.chats.filter(c => {
+        if (seen.has(String(c.id))) return false;
+        seen.add(String(c.id));
+        return true;
+      });
+    }
+
+    // 3. Re-sort chats descending by latest timestamp
+    this.model.chats.sort((a, b) => {
+      const timeA = a.lastMessageTimestamp || a.timestamp ? new Date(a.lastMessageTimestamp || a.timestamp).getTime() : 0;
+      const timeB = b.lastMessageTimestamp || b.timestamp ? new Date(b.lastMessageTimestamp || b.timestamp).getTime() : 0;
+      return timeB - timeA;
+    });
+
+    // 4. Re-render thread cards if any new chats were added or updated
+    if (hasNewChats || updatedChatId) {
+      const filtered = this.model.getFilteredChats();
+      this.view.renderThreadCards(filtered, this.model.selectedChatId);
+
+      // Animate the updated or newly added chat card!
+      if (updatedChatId) {
+        this.view.flashUpdate(`[data-chat-id="${updatedChatId}"]`);
+      }
+
+      // If no chat was previously selected (e.g. initial empty inbox), auto-select the new chat
+      if (!this.model.selectedChatId && filtered.length > 0) {
+        this.selectChat(filtered[0].id);
+      }
+    }
+  }
+
+  handlePolledActiveChatSync(pollResult) {
+    const { chatId, fullChat, orders } = pollResult;
+    let cachedChat = this.chatDetailsCache.get(chatId) || this.model.getChatById(chatId);
+    if (!cachedChat) return;
+
+    // 1. Check for new incoming messages
+    if (fullChat && Array.isArray(fullChat.messages)) {
+      const currentMessages = Array.isArray(cachedChat.messages) ? cachedChat.messages : [];
+      const currentIds = new Set(currentMessages.map(m => String(m.id || m._id)));
+      const newMessages = fullChat.messages.filter(m => !currentIds.has(String(m.id || m._id)));
+
+      if (newMessages.length > 0) {
+        // Append new messages to the UI stream with animation
+        this.view.appendNewMessages(newMessages, cachedChat);
+        cachedChat.messages = fullChat.messages;
+
+        // Update the thread card snippet in the left panel with pulse
+        const lastMsg = newMessages[newMessages.length - 1];
+        const snippetText = lastMsg.text || lastMsg.content || 'New message';
+        cachedChat.lastMessageSnippet = snippetText;
+        cachedChat.lastMessageTimestamp = lastMsg.createdAt || Date.now();
+        this.view.updateThreadCardSnippet(chatId, snippetText, cachedChat.lastMessageTimestamp, true);
+      }
+    }
+
+    // 2. Check for cart updates
+    if (fullChat && (fullChat.cart || fullChat.pendingSelections)) {
+      const oldCartTotal = cachedChat.cart?.totalPrice;
+      const newCartTotal = fullChat.cart?.totalPrice;
+      const oldItemsCount = Array.isArray(cachedChat.cart?.items) ? cachedChat.cart.items.length : 0;
+      const newItemsCount = Array.isArray(fullChat.cart?.items) ? fullChat.cart.items.length : 0;
+      const oldPending = cachedChat.pendingSelections?.productId;
+      const newPending = fullChat.pendingSelections?.productId;
+
+      const cartChanged = oldCartTotal !== newCartTotal || oldItemsCount !== newItemsCount || oldPending !== newPending;
+      if (cartChanged) {
+        cachedChat.cart = fullChat.cart;
+        cachedChat.pendingSelections = fullChat.pendingSelections;
+        this.view.updateActiveCart(cachedChat, true);
+      }
+    }
+
+    // 3. Check for customer orders updates
+    if (Array.isArray(orders)) {
+      const oldOrders = this.chatOrdersCache.get(chatId) || [];
+      const ordersChanged = JSON.stringify(oldOrders) !== JSON.stringify(orders);
+
+      if (ordersChanged) {
+        this.chatOrdersCache.set(chatId, orders);
+        this.currentChatOrders = orders;
+        this.view.renderUserOrders(orders, true);
+      }
+    }
+
+    this.chatDetailsCache.set(chatId, cachedChat);
   }
 
   async loadWorkspaceFilterOptions() {
@@ -236,21 +440,36 @@ export class ChatsController {
   }
 
   /**
-   * Selects a chat thread, triggers GET /chats/:id to load full chat data and messages,
-   * and renders the messages with agent blue background and explicit sender labels.
+   * Selects a chat thread, triggers GET /chats/:id to load full chat data and messages.
+   * Caches chat details and orders per-chat so return visits render instantly with zero loaders.
    */
   async selectChat(chatId) {
     this.model.selectedChatId = chatId;
     this.view.setActiveCard(chatId);
 
-    // 1. Immediately render cached chat metadata in Pane 2 & 3 while fetching
+    const isAlreadyLoaded = this.loadedChatsSet.has(chatId);
+
+    // If chat was already opened previously, display from cache immediately with ZERO loaders!
+    if (isAlreadyLoaded) {
+      const cachedChat = this.chatDetailsCache.get(chatId) || this.model.getChatById(chatId);
+      const cachedOrders = this.chatOrdersCache.get(chatId) || [];
+      this.currentChatOrders = cachedOrders;
+
+      if (cachedChat) {
+        this.view.renderActiveChat(cachedChat, cachedChat.messages, cachedOrders);
+        this.view.scrollToBottom();
+      }
+      return;
+    }
+
+    // FIRST TIME ONLY for this chat:
     let chat = this.model.getChatById(chatId);
     if (chat) {
       this.view.renderActiveChat(chat);
-      this.view.setChatStreamLoading();
+      this.view.setChatStreamLoading(); // Loader only shown on first visit
     }
 
-    // 2. Fetch full chat data and messages from GET /chats/:id
+    // Fetch full chat data, messages, and customer orders
     try {
       const fullChatData = await this.model.fetchChatDetails(chatId);
       if (fullChatData) {
@@ -262,26 +481,27 @@ export class ChatsController {
           userName: fullChatData.userName || chat?.userName || chat?.user_name,
           user_name: fullChatData.userName || chat?.userName || chat?.user_name
         };
-        // Re-render complete chat timeline and context sidebar
-        this.view.renderActiveChat(chat, chat.messages);
-        this.view.scrollToBottom();
 
-        // 3. Fetch customer orders using GET /orders/sender/:senderId
+        // Fetch customer orders using GET /orders/sender/:senderId
         const senderId = chat.senderId || (typeof chat.sender_id === 'object' ? chat.sender_id.id : chat.sender_id);
+        let orders = [];
         if (senderId) {
           try {
-            const orders = await this.model.fetchOrdersBySender(senderId);
-            this.currentChatOrders = Array.isArray(orders) ? orders : [];
-            this.view.renderUserOrders(this.currentChatOrders);
+            const fetchedOrders = await this.model.fetchOrdersBySender(senderId);
+            orders = Array.isArray(fetchedOrders) ? fetchedOrders : [];
           } catch (orderErr) {
             console.warn(`ChatsController: Could not load orders for sender ${senderId}:`, orderErr);
-            this.currentChatOrders = [];
-            this.view.renderUserOrders([]);
           }
-        } else {
-          this.currentChatOrders = [];
-          this.view.renderUserOrders([]);
         }
+
+        this.currentChatOrders = orders;
+        this.chatDetailsCache.set(chatId, chat);
+        this.chatOrdersCache.set(chatId, orders);
+        this.loadedChatsSet.add(chatId);
+
+        // Render complete chat timeline and context sidebar with orders
+        this.view.renderActiveChat(chat, chat.messages, orders);
+        this.view.scrollToBottom();
       }
     } catch (err) {
       console.error(`ChatsController: Error fetching chat details for #${chatId}:`, err);

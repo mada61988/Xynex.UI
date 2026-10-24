@@ -3867,7 +3867,12 @@ export class DashboardView {
       }
       return `
         <tr class="hover:bg-zinc-800/40 transition">
-          <td class="py-3 px-3 text-xs font-mono font-bold text-white">${this._escape(v.sku || 'N/A')}</td>
+          <td class="py-3 px-3 text-xs font-mono font-bold text-white">
+            <div class="flex items-center gap-2">
+              ${v.imageUrl ? `<img src="${this._escape(v.imageUrl)}" class="w-6 h-6 rounded-lg object-cover border border-zinc-700/80 shrink-0" onerror="this.remove()" />` : ''}
+              <span>${this._escape(v.sku || 'N/A')}</span>
+            </div>
+          </td>
           <td class="py-3 px-3 text-xs text-zinc-300">${attrDisplay}</td>
           <td class="py-3 px-3 text-xs font-mono font-semibold text-white">$${Number(v.price || 0).toFixed(2)}</td>
           <td class="py-3 px-3 text-right">
@@ -4196,335 +4201,897 @@ export class DashboardView {
   }
 
   /**
-   * Opens the Create Product Modal with full attribute and variant configuration
+   * Opens the Option-to-Matrix Slide-out Drawer for creating a product and its variants
    */
-  openCreateProductModal({ workspaceId, onSubmit }) {
+  openCreateProductDrawer({ workspaceId, onSubmit }) {
     if (!this.modalContainer) {
       this.modalContainer = document.getElementById('modal-container');
     }
     if (!this.modalContainer) return;
 
-    let attributesList = ['Size', 'Color'];
+    // Local Component State - Clean slate with NO hardcoded default values
+    let state = {
+      name: '',
+      price: '',
+      status: true,
+      imageUrl: '',
+      description: '',
+      hasOptions: false,
+      options: [],
+      // Tracks user-edited values per combination key
+      customMatrixData: new Map(),
+      // Set of excluded combinations
+      excludedKeys: new Set(),
+      singleSku: '',
+      singleStock: 0
+    };
+
+    let nextOptionId = 1;
+
+    // Helper: Compute Cartesian Product of Options
+    const computeCombinations = () => {
+      const activeOptions = state.options
+        .map(o => ({
+          name: o.name.trim(),
+          values: o.values.map(v => v.trim()).filter(Boolean)
+        }))
+        .filter(o => o.name && o.values.length > 0);
+
+      if (activeOptions.length === 0) return [];
+
+      return activeOptions.reduce((acc, currentOpt) => {
+        const next = [];
+        acc.forEach(combo => {
+          currentOpt.values.forEach(val => {
+            next.push({
+              ...combo,
+              [currentOpt.name]: val
+            });
+          });
+        });
+        return next;
+      }, [{}]);
+    };
+
+    // Helper: Generate a suggested SKU for a combination
+    const buildSuggestedSku = (combo) => {
+      const prodPrefix = (state.name.trim() || 'PROD')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '')
+        .slice(0, 6) || 'PROD';
+
+      const comboParts = Object.values(combo)
+        .map(v => String(v).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4))
+        .filter(Boolean)
+        .join('-');
+
+      return comboParts ? `${prodPrefix}-${comboParts}` : `${prodPrefix}-01`;
+    };
+
+    // Helper: Generate combination key
+    const getComboKey = (combo) => {
+      return Object.entries(combo)
+        .sort(([k1], [k2]) => k1.localeCompare(k2))
+        .map(([k, v]) => `${k}:${v}`)
+        .join('|');
+    };
 
     this.modalContainer.innerHTML = `
-      <div id="create-product-modal-backdrop" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
-        <div class="bento-card w-full max-w-2xl rounded-3xl p-6 sm:p-8 relative border border-zinc-700/80 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
+      <div id="create-product-drawer-backdrop" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex justify-end transition-opacity duration-300 opacity-0">
+        <div id="create-product-drawer" class="w-full max-w-3xl h-full bg-[#111114] border-l border-zinc-800/80 shadow-2xl flex flex-col transform translate-x-full transition-transform duration-300 ease-out">
           
-          <!-- Close Button -->
-          <button type="button" id="close-create-product-modal-btn" class="absolute top-5 right-5 text-zinc-400 hover:text-white p-2 rounded-xl hover:bg-zinc-800 transition cursor-pointer" aria-label="Close modal">
-            <i class="fa-solid fa-xmark text-sm"></i>
-          </button>
-
-          <div class="pb-4 border-b border-zinc-800">
-            <div class="flex items-center gap-2.5">
-              <div class="w-8 h-8 rounded-xl bg-white text-black flex items-center justify-center font-bold text-sm shadow-md">
-                <i class="fa-solid fa-box-open"></i>
+          <!-- Sticky Drawer Header -->
+          <div class="px-6 py-5 border-b border-zinc-800 bg-[#0d0d10]/95 backdrop-blur-md flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl bg-white text-black flex items-center justify-center font-bold text-sm shadow-md">
+                <i class="fa-solid fa-boxes-stacked"></i>
               </div>
-              <h2 class="text-lg sm:text-xl font-bold text-white tracking-tight">Add New Product</h2>
+              <div>
+                <h2 class="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                  <span>Create Product</span>
+                  <span class="text-[10px] font-mono uppercase bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full border border-zinc-700/60">Option-to-Matrix</span>
+                </h2>
+                <p class="text-xs text-zinc-400">Configure base details, options, and generate variant inventory matrix.</p>
+              </div>
             </div>
-            <p class="text-xs text-zinc-400 mt-1">Create a catalog item with attributes and inventory for Workspace #${workspaceId || ''}</p>
+            <button type="button" id="close-product-drawer-btn" class="text-zinc-400 hover:text-white p-2 rounded-xl hover:bg-zinc-800 transition cursor-pointer" aria-label="Close drawer">
+              <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
           </div>
 
-          <form id="create-product-form" class="space-y-5 mt-5">
+          <!-- Scrollable Drawer Body -->
+          <div class="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6 no-scrollbar">
+            
             <div id="create-product-feedback" class="hidden text-xs py-2.5 px-3.5 rounded-xl"></div>
 
-            <!-- Field: Name -->
-            <div>
-              <label for="new-product-name" class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">
-                Product Name <span class="text-rose-400">*</span>
-              </label>
-              <input 
-                type="text" 
-                id="new-product-name" 
-                required 
-                placeholder="e.g. Signature Cotton Hoodie" 
-                class="w-full bg-[#0d0d10] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition"
-              />
-            </div>
+            <!-- SECTION 1: BASE DETAILS -->
+            <div class="bento-card p-5 sm:p-6 rounded-2xl bg-[#0d0d10] border border-zinc-800 space-y-4">
+              <div class="flex items-center justify-between pb-3 border-b border-zinc-800/80">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+                  <i class="fa-solid fa-cube text-zinc-400"></i>
+                  <span>1. Base Details</span>
+                </h3>
+                <span class="text-[11px] text-zinc-500">Core catalog identifiers</span>
+              </div>
 
-            <!-- Grid: Price & Status -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <!-- Product Name -->
               <div>
-                <label for="new-product-price" class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">
-                  Base Price ($) <span class="text-rose-400">*</span>
+                <label for="drawer-product-name" class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">
+                  Product Name <span class="text-rose-400">*</span>
                 </label>
-                <div class="relative">
-                  <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
-                    <span class="text-xs font-mono font-bold">$</span>
+                <input 
+                  type="text" 
+                  id="drawer-product-name" 
+                  value="${this._escape(state.name)}"
+                  placeholder="e.g. Classic Oxford Cotton Shirt" 
+                  class="w-full bg-[#18181b] border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 transition"
+                  required
+                />
+              </div>
+
+              <!-- Price & Status -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label for="drawer-product-price" class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">
+                    Base Price ($) <span class="text-rose-400">*</span>
+                  </label>
+                  <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-400 font-mono text-xs font-bold">$</span>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      min="0" 
+                      id="drawer-product-price" 
+                      value="${state.price}" 
+                      placeholder="49.99" 
+                      class="w-full bg-[#18181b] border border-zinc-700/80 rounded-xl pl-8 pr-3.5 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-zinc-400 transition"
+                      required
+                    />
                   </div>
-                  <input 
-                    type="number" 
-                    step="0.01" 
-                    min="0" 
-                    id="new-product-price" 
-                    required 
-                    placeholder="49.99" 
-                    class="w-full bg-[#0d0d10] border border-zinc-800 rounded-xl pl-8 pr-3.5 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition"
-                  />
+                </div>
+
+                <div>
+                  <label for="drawer-product-status" class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">
+                    Storefront Status
+                  </label>
+                  <select 
+                    id="drawer-product-status" 
+                    class="w-full bg-[#18181b] border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-zinc-400 cursor-pointer"
+                  >
+                    <option value="true" ${state.status ? 'selected' : ''}>Active (Immediately visible)</option>
+                    <option value="false" ${!state.status ? 'selected' : ''}>Draft (Hidden from customers)</option>
+                  </select>
                 </div>
               </div>
 
+              <!-- Media Upload / Image URL -->
               <div>
-                <label for="new-product-status" class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">
-                  Initial Status
+                <label for="drawer-product-image" class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">
+                  Media / Image URL (Optional)
                 </label>
-                <select 
-                  id="new-product-status" 
-                  class="w-full bg-[#0d0d10] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-zinc-500 cursor-pointer"
-                >
-                  <option value="true" selected>Active (Storefront Visible)</option>
-                  <option value="false">Draft (Hidden)</option>
-                </select>
+                <div class="flex gap-3">
+                  <input 
+                    type="url" 
+                    id="drawer-product-image" 
+                    value="${this._escape(state.imageUrl)}"
+                    placeholder="https://images.unsplash.com/..." 
+                    class="flex-1 bg-[#18181b] border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-400 transition"
+                  />
+                  <div id="drawer-image-preview" class="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-600 shrink-0 overflow-hidden">
+                    <i class="fa-solid fa-image text-sm"></i>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Description -->
+              <div>
+                <label for="drawer-product-description" class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">
+                  Description
+                </label>
+                <textarea 
+                  id="drawer-product-description" 
+                  rows="2" 
+                  placeholder="Detail specifications, sizing, materials, or features..." 
+                  class="w-full bg-[#18181b] border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-400 transition"
+                >${this._escape(state.description)}</textarea>
               </div>
             </div>
 
-            <!-- Field: Image URL -->
-            <div>
-              <label for="new-product-image" class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">
-                Image URL (Optional)
-              </label>
-              <input 
-                type="url" 
-                id="new-product-image" 
-                placeholder="https://images.unsplash.com/..." 
-                class="w-full bg-[#0d0d10] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500 transition"
-              />
-            </div>
-
-            <!-- Field: Description -->
-            <div>
-              <label for="new-product-description" class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">
-                Description (Optional)
-              </label>
-              <textarea 
-                id="new-product-description" 
-                rows="2" 
-                placeholder="Brief summary of fabric, specs, or styling notes..." 
-                class="w-full bg-[#0d0d10] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500 transition"
-              ></textarea>
-            </div>
-
-            <!-- Section: Product Attributes Tag Manager -->
-            <div class="pt-3 border-t border-zinc-800/80">
-              <div class="flex items-center justify-between mb-1.5">
-                <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-300">
-                  Product Attributes <span class="text-rose-400">*</span>
-                </label>
-                <span class="text-[10px] text-zinc-500">Dimensions (e.g. Size, Color, Material)</span>
-              </div>
-              
-              <div class="p-3 rounded-2xl bg-[#0d0d10] border border-zinc-800 space-y-2.5">
-                <div id="new-product-attributes-tags" class="flex flex-wrap gap-1.5 min-h-[28px]">
-                  <!-- Rendered dynamically -->
+            <!-- SECTION 2: VARIANT GENERATOR (OPTIONS) -->
+            <div class="bento-card p-5 sm:p-6 rounded-2xl bg-[#0d0d10] border border-zinc-800 space-y-4">
+              <div class="flex items-center justify-between pb-3 border-b border-zinc-800/80">
+                <div class="flex items-center gap-2">
+                  <i class="fa-solid fa-sliders text-zinc-400"></i>
+                  <div>
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-300">2. Variant Options</h3>
+                    <p class="text-[11px] text-zinc-500">Configure dimensional attributes (e.g. Size, Color, Material)</p>
+                  </div>
                 </div>
                 
+                <!-- Options Switch Toggle -->
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="drawer-options-toggle" class="sr-only peer" ${state.hasOptions ? 'checked' : ''}>
+                  <div class="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                </label>
+              </div>
+
+              <!-- Options Builder (Visible when Toggle is ON) -->
+              <div id="drawer-options-builder" class="${state.hasOptions ? 'space-y-4' : 'hidden'}">
+                <div id="drawer-options-list" class="space-y-3">
+                  <!-- Option cards rendered dynamically -->
+                </div>
+
+                <button 
+                  type="button" 
+                  id="drawer-add-option-btn" 
+                  class="w-full py-2.5 rounded-xl border border-dashed border-zinc-700 hover:border-zinc-500 bg-zinc-900/40 hover:bg-zinc-800/40 text-xs font-semibold text-zinc-300 hover:text-white transition flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <i class="fa-solid fa-plus text-xs"></i>
+                  <span>Add Another Option</span>
+                </button>
+              </div>
+
+              <!-- Single Variant Fallback (When Toggle is OFF) -->
+              <div id="drawer-single-variant-box" class="${!state.hasOptions ? 'space-y-3' : 'hidden'}">
+                <p class="text-xs text-zinc-400 leading-relaxed">
+                  This product has no multiple variant options. A default single SKU will be created with your base price.
+                </p>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                  <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">SKU</label>
+                    <input 
+                      type="text" 
+                      id="drawer-single-sku" 
+                      value="${this._escape(state.singleSku)}" 
+                      class="w-full bg-[#18181b] border border-zinc-700/80 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-zinc-400"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">Initial Stock</label>
+                    <input 
+                      type="number" 
+                      min="0" 
+                      id="drawer-single-stock" 
+                      value="${state.singleStock}" 
+                      class="w-full bg-[#18181b] border border-zinc-700/80 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-zinc-400"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1">Variant Image URL</label>
+                    <input 
+                      type="url" 
+                      id="drawer-single-image" 
+                      placeholder="Defaults to base image..." 
+                      class="w-full bg-[#18181b] border border-zinc-700/80 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-400"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SECTION 3: DYNAMIC MATRIX TABLE -->
+            <div id="drawer-matrix-section" class="bento-card p-5 sm:p-6 rounded-2xl bg-[#0d0d10] border border-zinc-800 space-y-4 ${state.hasOptions ? '' : 'hidden'}">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-800/80">
                 <div class="flex items-center gap-2">
-                  <input 
-                    type="text" 
-                    id="new-product-attr-input" 
-                    placeholder="Add an attribute (e.g. Material) and press Enter" 
-                    class="flex-1 bg-[#18181b] border border-zinc-700/80 rounded-xl px-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
-                  />
+                  <i class="fa-solid fa-table-cells text-zinc-400"></i>
+                  <div>
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-300">3. Variant Matrix</h3>
+                    <p class="text-[11px] text-zinc-500">Cartesian permutations generated from your options</p>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <span id="drawer-matrix-counter" class="text-[11px] font-mono text-zinc-400 bg-zinc-800/90 border border-zinc-700/80 px-2.5 py-0.5 rounded-full font-bold">
+                    0 Variants
+                  </span>
                   <button 
                     type="button" 
-                    id="new-product-add-attr-btn" 
-                    class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 px-3 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer"
+                    id="drawer-sync-prices-btn" 
+                    class="text-[10px] font-semibold text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800 hover:border-zinc-700 px-2.5 py-1 rounded-lg transition cursor-pointer"
+                    title="Reset all variant prices to Base Price"
                   >
-                    + Add
+                    Sync Prices
                   </button>
                 </div>
               </div>
-            </div>
 
-            <!-- Section: Initial Variant Setup -->
-            <div class="pt-3 border-t border-zinc-800/80">
-              <label class="block text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1.5">
-                Initial Stock & SKU <span class="text-rose-400">*</span>
-              </label>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <input 
-                    type="text" 
-                    id="new-product-sku" 
-                    placeholder="SKU (e.g. HOODIE-BLK-01)" 
-                    class="w-full bg-[#0d0d10] border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white font-mono placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
-                  />
-                </div>
-                <div>
-                  <input 
-                    type="number" 
-                    min="1" 
-                    id="new-product-stock" 
-                    value="25" 
-                    placeholder="Initial Stock" 
-                    class="w-full bg-[#0d0d10] border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white font-mono placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
-                  />
-                </div>
+              <!-- Matrix Table Container -->
+              <div id="drawer-matrix-table-container">
+                <!-- Rendered dynamically -->
               </div>
             </div>
 
-            <!-- Modal Footer -->
-            <div class="pt-4 border-t border-zinc-800 flex items-center justify-end gap-3">
+          </div>
+
+          <!-- Sticky Drawer Footer -->
+          <div class="px-6 py-4 border-t border-zinc-800 bg-[#0d0d10]/95 backdrop-blur-md flex items-center justify-between shrink-0">
+            <div class="text-xs text-zinc-400 flex items-center gap-2">
+              <span id="drawer-footer-summary">0 variants configured</span>
+            </div>
+
+            <div class="flex items-center gap-3">
               <button 
                 type="button" 
-                id="cancel-create-product-btn" 
+                id="drawer-cancel-btn" 
                 class="border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 px-4 py-2.5 rounded-xl text-xs font-medium transition cursor-pointer"
               >
                 Cancel
               </button>
               <button 
-                type="submit" 
-                id="submit-create-product-btn" 
+                type="button" 
+                id="drawer-submit-btn" 
                 class="bg-white hover:bg-zinc-200 text-black px-6 py-2.5 rounded-xl text-xs font-semibold transition flex items-center gap-2 cursor-pointer shadow-md"
               >
                 <i class="fa-solid fa-plus text-xs"></i>
-                <span>Create Product</span>
+                <span>Save Product</span>
               </button>
             </div>
-          </form>
+          </div>
 
         </div>
       </div>
     `;
 
-    // Render attribute tags inside modal
-    const tagsContainer = document.getElementById('new-product-attributes-tags');
-    const attrInput = document.getElementById('new-product-attr-input');
-    const addAttrBtn = document.getElementById('new-product-add-attr-btn');
+    // References
+    const backdrop = document.getElementById('create-product-drawer-backdrop');
+    const drawer = document.getElementById('create-product-drawer');
+    const closeBtn = document.getElementById('close-product-drawer-btn');
+    const cancelBtn = document.getElementById('drawer-cancel-btn');
+    const submitBtn = document.getElementById('drawer-submit-btn');
+    const optionsToggle = document.getElementById('drawer-options-toggle');
+    const optionsBuilder = document.getElementById('drawer-options-builder');
+    const singleVariantBox = document.getElementById('drawer-single-variant-box');
+    const matrixSection = document.getElementById('drawer-matrix-section');
+    const optionsList = document.getElementById('drawer-options-list');
+    const addOptionBtn = document.getElementById('drawer-add-option-btn');
+    const matrixTableContainer = document.getElementById('drawer-matrix-table-container');
+    const matrixCounter = document.getElementById('drawer-matrix-counter');
+    const footerSummary = document.getElementById('drawer-footer-summary');
+    const syncPricesBtn = document.getElementById('drawer-sync-prices-btn');
+    const nameInput = document.getElementById('drawer-product-name');
+    const priceInput = document.getElementById('drawer-product-price');
+    const imageInput = document.getElementById('drawer-product-image');
+    const imagePreview = document.getElementById('drawer-image-preview');
 
-    const renderTags = () => {
-      if (!tagsContainer) return;
-      if (attributesList.length === 0) {
-        tagsContainer.innerHTML = `<span class="text-xs text-zinc-500 italic">No attributes added yet.</span>`;
+    // Trigger smooth slide-in
+    requestAnimationFrame(() => {
+      if (backdrop) backdrop.classList.remove('opacity-0');
+      if (drawer) drawer.classList.remove('translate-x-full');
+    });
+
+    const closeDrawer = () => {
+      if (drawer) drawer.classList.add('translate-x-full');
+      if (backdrop) backdrop.classList.add('opacity-0');
+      setTimeout(() => this.closeProductDetailsModal(), 300);
+    };
+
+    if (closeBtn) closeBtn.onclick = closeDrawer;
+    if (cancelBtn) cancelBtn.onclick = closeDrawer;
+    if (backdrop) {
+      backdrop.onclick = (e) => {
+        if (e.target === backdrop) closeDrawer();
+      };
+    }
+
+    // Image preview helper
+    if (imageInput && imagePreview) {
+      imageInput.oninput = () => {
+        const val = imageInput.value.trim();
+        state.imageUrl = val;
+        if (val) {
+          imagePreview.innerHTML = `<img src="${this._escape(val)}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<i class=\\'fa-solid fa-image text-sm\\'></i>';" />`;
+        } else {
+          imagePreview.innerHTML = `<i class="fa-solid fa-image text-sm"></i>`;
+        }
+      };
+    }
+
+    // Name & Base Price input listeners
+    if (nameInput) {
+      nameInput.oninput = () => {
+        state.name = nameInput.value;
+        renderMatrixTable();
+      };
+    }
+
+    if (priceInput) {
+      priceInput.oninput = () => {
+        const p = parseFloat(priceInput.value) || 0;
+        state.price = p;
+      };
+    }
+
+    // Toggle Handler: Multi-options vs Single Product
+    if (optionsToggle) {
+      optionsToggle.onchange = () => {
+        state.hasOptions = optionsToggle.checked;
+        if (state.hasOptions) {
+          if (state.options.length === 0) {
+            state.options.push({ id: nextOptionId++, name: '', values: [] });
+            renderOptionsList();
+          }
+          optionsBuilder.classList.remove('hidden');
+          singleVariantBox.classList.add('hidden');
+          matrixSection.classList.remove('hidden');
+        } else {
+          optionsBuilder.classList.add('hidden');
+          singleVariantBox.classList.remove('hidden');
+          matrixSection.classList.add('hidden');
+        }
+        renderMatrixTable();
+        updateFooterSummary();
+      };
+    }
+
+    // Render Option Builder Cards
+    const renderOptionsList = () => {
+      if (!optionsList) return;
+
+      if (state.options.length === 0) {
+        optionsList.innerHTML = `
+          <div class="p-4 rounded-xl bg-[#141417] border border-zinc-800 text-center text-zinc-500 text-xs">
+            No options defined yet. Click "Add Option" below to specify an option (e.g. Size, Color, Model).
+          </div>
+        `;
         return;
       }
-      tagsContainer.innerHTML = attributesList.map(a => `
-        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-800 text-zinc-200 border border-zinc-700/80 text-xs font-medium">
-          <span>${this._escape(a)}</span>
-          <button type="button" class="remove-tag-btn text-zinc-500 hover:text-rose-400 p-0.5 cursor-pointer text-[10px]" data-tag="${this._escape(a)}">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-        </span>
+
+      optionsList.innerHTML = state.options.map((opt, idx) => `
+        <div class="option-card p-4 rounded-xl bg-[#141417] border border-zinc-800 space-y-3" data-option-id="${opt.id}">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex-1">
+              <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                Option ${idx + 1} Name
+              </label>
+              <input 
+                type="text" 
+                value="${this._escape(opt.name)}" 
+                placeholder="e.g. Size, Color, Material, Model" 
+                class="option-name-input w-full bg-[#1e1e22] border border-zinc-700/80 rounded-lg px-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-400 font-semibold"
+              />
+            </div>
+            ${state.options.length > 1 ? `
+              <button type="button" class="btn-remove-option text-zinc-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-zinc-800/80 transition cursor-pointer text-xs mt-3.5" title="Remove option">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            ` : ''}
+          </div>
+
+          <!-- Tags list & Input -->
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+              Option Values
+            </label>
+            <div class="p-2.5 rounded-xl bg-[#18181b] border border-zinc-700/60 flex flex-wrap items-center gap-1.5 min-h-[38px]">
+              ${opt.values.map(val => `
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-800 text-zinc-200 border border-zinc-700 text-xs font-medium">
+                  <span>${this._escape(val)}</span>
+                  <button type="button" class="btn-remove-tag text-zinc-500 hover:text-rose-400 cursor-pointer text-[10px]" data-val="${this._escape(val)}">
+                    <i class="fa-solid fa-xmark"></i>
+                  </button>
+                </span>
+              `).join('')}
+
+              <input 
+                type="text" 
+                placeholder="Add value and press Enter..." 
+                class="option-value-input bg-transparent text-xs text-white placeholder-zinc-500 focus:outline-none px-2 py-0.5 flex-1 min-w-[150px]"
+              />
+            </div>
+          </div>
+        </div>
       `).join('');
 
-      tagsContainer.querySelectorAll('.remove-tag-btn').forEach(btn => {
-        btn.onclick = () => {
-          const tag = btn.dataset.tag;
-          attributesList = attributesList.filter(t => t !== tag);
-          renderTags();
-        };
+      // Bind Option Card Events
+      optionsList.querySelectorAll('.option-card').forEach(card => {
+        const optId = Number(card.dataset.optionId);
+        const opt = state.options.find(o => o.id === optId);
+        if (!opt) return;
+
+        // Name input
+        const nameInp = card.querySelector('.option-name-input');
+        if (nameInp) {
+          nameInp.oninput = () => {
+            opt.name = nameInp.value;
+            renderMatrixTable();
+          };
+        }
+
+        // Value tag removal
+        card.querySelectorAll('.btn-remove-tag').forEach(btn => {
+          btn.onclick = () => {
+            const valToRemove = btn.dataset.val;
+            opt.values = opt.values.filter(v => v !== valToRemove);
+            renderOptionsList();
+            renderMatrixTable();
+          };
+        });
+
+        // Value tag input
+        const valInp = card.querySelector('.option-value-input');
+        if (valInp) {
+          valInp.onkeydown = (e) => {
+            if (e.key === 'Enter' || e.key === ',') {
+              e.preventDefault();
+              const val = valInp.value.trim().replace(/^,|,$/g, '');
+              if (val && !opt.values.includes(val)) {
+                opt.values.push(val);
+                valInp.value = '';
+                renderOptionsList();
+                renderMatrixTable();
+              }
+            }
+          };
+        }
+
+        // Remove option card
+        const removeOptBtn = card.querySelector('.btn-remove-option');
+        if (removeOptBtn) {
+          removeOptBtn.onclick = () => {
+            state.options = state.options.filter(o => o.id !== optId);
+            renderOptionsList();
+            renderMatrixTable();
+          };
+        }
       });
     };
 
-    renderTags();
+    // Render Dynamic Matrix Table (Cartesian Product Permutations)
+    const renderMatrixTable = () => {
+      if (!matrixTableContainer) return;
 
-    const addTag = () => {
-      const val = attrInput?.value.trim();
-      if (!val) return;
-      if (!attributesList.includes(val)) {
-        attributesList.push(val);
-        renderTags();
+      const combinations = computeCombinations();
+
+      if (combinations.length === 0) {
+        matrixTableContainer.innerHTML = `
+          <div class="p-8 text-center rounded-xl bg-[#141417] border border-zinc-800 text-zinc-500 text-xs">
+            <i class="fa-solid fa-wand-magic-sparkles text-lg text-zinc-600 mb-2 block"></i>
+            Add option values above (e.g. S, M, L) to automatically generate the variant matrix table.
+          </div>
+        `;
+        if (matrixCounter) matrixCounter.textContent = '0 Variants';
+        updateFooterSummary(0);
+        return;
       }
-      if (attrInput) {
-        attrInput.value = '';
-        attrInput.focus();
+
+      const activeCombinations = combinations.filter(combo => !state.excludedKeys.has(getComboKey(combo)));
+
+      if (matrixCounter) {
+        matrixCounter.textContent = `${activeCombinations.length} of ${combinations.length} Active`;
       }
+
+      const rowsHtml = combinations.map(combo => {
+        const key = getComboKey(combo);
+        const isExcluded = state.excludedKeys.has(key);
+        const custom = state.customMatrixData.get(key) || {};
+
+        const comboLabel = Object.values(combo).join(' · ');
+        const sku = custom.sku !== undefined ? custom.sku : buildSuggestedSku(combo);
+        const price = custom.price !== undefined ? custom.price : (state.price !== '' ? state.price : '');
+        const stock = custom.stock !== undefined ? custom.stock : 0;
+        const variantImg = custom.imageUrl || '';
+
+        return `
+          <tr class="transition group/row ${isExcluded ? 'opacity-40 bg-zinc-900/50' : 'hover:bg-zinc-800/30'}" data-combo-key="${this._escape(key)}">
+            <!-- Combination Badge -->
+            <td class="py-2.5 px-3.5">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold ${isExcluded ? 'bg-zinc-800 text-zinc-500 line-through' : 'bg-zinc-800/90 text-zinc-200 border border-zinc-700/60'}">
+                ${this._escape(comboLabel)}
+              </span>
+            </td>
+
+            <!-- Variant Image URL & Thumbnail -->
+            <td class="py-2.5 px-3">
+              <div class="flex items-center gap-2">
+                <div class="matrix-variant-img-preview w-8 h-8 rounded-lg overflow-hidden bg-zinc-900 border border-zinc-700/80 flex items-center justify-center shrink-0 text-zinc-500">
+                  ${variantImg ? `<img src="${this._escape(variantImg)}" class="w-full h-full object-cover" onerror="this.onerror=null;this.parentElement.innerHTML='<i class=\\'fa-solid fa-image text-xs text-zinc-600\\'></i>';" />` : `<i class="fa-solid fa-image text-xs text-zinc-600"></i>`}
+                </div>
+                <input 
+                  type="url" 
+                  value="${this._escape(custom.imageUrl || '')}" 
+                  placeholder="URL..." 
+                  ${isExcluded ? 'disabled' : ''}
+                  class="matrix-image-input w-28 sm:w-36 bg-[#18181b] border border-zinc-700/80 rounded-lg px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-400"
+                  title="Custom image URL for this specific variant (defaults to base image)"
+                />
+              </div>
+            </td>
+
+            <!-- SKU Input -->
+            <td class="py-2.5 px-3">
+              <input 
+                type="text" 
+                value="${this._escape(sku)}" 
+                ${isExcluded ? 'disabled' : ''}
+                class="matrix-sku-input w-full bg-[#18181b] border border-zinc-700/80 rounded-lg px-2.5 py-1 text-xs text-white font-mono focus:outline-none focus:border-zinc-400"
+              />
+            </td>
+
+            <!-- Price Input -->
+            <td class="py-2.5 px-3">
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-2 flex items-center text-zinc-500 font-mono text-[10px]">$</span>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  min="0" 
+                  value="${price}" 
+                  ${isExcluded ? 'disabled' : ''}
+                  class="matrix-price-input w-24 bg-[#18181b] border border-zinc-700/80 rounded-lg pl-5 pr-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-zinc-400"
+                />
+              </div>
+            </td>
+
+            <!-- Stock Input -->
+            <td class="py-2.5 px-3">
+              <input 
+                type="number" 
+                min="0" 
+                value="${stock}" 
+                ${isExcluded ? 'disabled' : ''}
+                class="matrix-stock-input w-20 bg-[#18181b] border border-zinc-700/80 rounded-lg px-2.5 py-1 text-xs text-white font-mono focus:outline-none focus:border-zinc-400"
+              />
+            </td>
+
+            <!-- Action: Delete Row / Restore Row -->
+            <td class="py-2.5 px-3 text-right">
+              ${isExcluded ? `
+                <button type="button" class="btn-restore-matrix-row text-xs text-emerald-400 hover:text-emerald-300 px-2 py-1 rounded hover:bg-zinc-800 transition cursor-pointer">
+                  Restore
+                </button>
+              ` : `
+                <button type="button" class="btn-delete-matrix-row text-zinc-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-zinc-800 transition cursor-pointer" title="Exclude this variant">
+                  <i class="fa-solid fa-trash text-xs"></i>
+                </button>
+              `}
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      matrixTableContainer.innerHTML = `
+        <div class="overflow-x-auto no-scrollbar border border-zinc-800/80 rounded-2xl bg-[#0d0d10]/60">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-zinc-800 text-[10px] font-bold uppercase text-zinc-400 tracking-wider bg-[#141417]">
+                <th class="py-3 px-3.5">Variant Combination</th>
+                <th class="py-3 px-3">Variant Image</th>
+                <th class="py-3 px-3">SKU</th>
+                <th class="py-3 px-3">Price ($)</th>
+                <th class="py-3 px-3">Stock</th>
+                <th class="py-3 px-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-800/60">
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      // Bind Matrix row inputs & delete actions
+      matrixTableContainer.querySelectorAll('tr[data-combo-key]').forEach(tr => {
+        const key = tr.dataset.comboKey;
+
+        const skuInp = tr.querySelector('.matrix-sku-input');
+        const priceInp = tr.querySelector('.matrix-price-input');
+        const stockInp = tr.querySelector('.matrix-stock-input');
+        const imgInp = tr.querySelector('.matrix-image-input');
+        const imgPreview = tr.querySelector('.matrix-variant-img-preview');
+
+        const saveCustomData = () => {
+          const prev = state.customMatrixData.get(key) || {};
+          state.customMatrixData.set(key, {
+            sku: skuInp ? skuInp.value.trim() : prev.sku,
+            price: priceInp ? parseFloat(priceInp.value) || 0 : prev.price,
+            stock: stockInp ? parseInt(stockInp.value, 10) || 0 : prev.stock,
+            imageUrl: imgInp ? imgInp.value.trim() : prev.imageUrl
+          });
+        };
+
+        if (skuInp) skuInp.oninput = saveCustomData;
+        if (priceInp) priceInp.oninput = saveCustomData;
+        if (stockInp) stockInp.oninput = saveCustomData;
+
+        if (imgInp && imgPreview) {
+          imgInp.oninput = () => {
+            saveCustomData();
+            const val = imgInp.value.trim() || state.imageUrl;
+            if (val) {
+              imgPreview.innerHTML = `<img src="${this._escape(val)}" class="w-full h-full object-cover" onerror="this.onerror=null;this.parentElement.innerHTML='<i class=\\'fa-solid fa-image text-xs text-zinc-600\\'></i>';" />`;
+            } else {
+              imgPreview.innerHTML = `<i class="fa-solid fa-image text-xs text-zinc-600"></i>`;
+            }
+          };
+        }
+
+        const delBtn = tr.querySelector('.btn-delete-matrix-row');
+        if (delBtn) {
+          delBtn.onclick = () => {
+            state.excludedKeys.add(key);
+            renderMatrixTable();
+          };
+        }
+
+        const restoreBtn = tr.querySelector('.btn-restore-matrix-row');
+        if (restoreBtn) {
+          restoreBtn.onclick = () => {
+            state.excludedKeys.delete(key);
+            renderMatrixTable();
+          };
+        }
+      });
+
+      updateFooterSummary(activeCombinations.length);
     };
 
-    if (addAttrBtn) addAttrBtn.onclick = addTag;
-    if (attrInput) {
-      attrInput.onkeydown = (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          addTag();
+    // Update bottom footer counter
+    const updateFooterSummary = (activeCount = null) => {
+      if (!footerSummary) return;
+      if (!state.hasOptions) {
+        footerSummary.textContent = 'Single item catalog product (1 variant)';
+        return;
+      }
+      const count = activeCount !== null ? activeCount : computeCombinations().filter(c => !state.excludedKeys.has(getComboKey(c))).length;
+      footerSummary.textContent = `${count} ${count === 1 ? 'variant' : 'variants'} will be created`;
+    };
+
+    // Add option button
+    if (addOptionBtn) {
+      addOptionBtn.onclick = () => {
+        if (state.options.length >= 4) {
+          this.showToast({ type: 'info', message: 'Maximum 4 option dimensions supported.' });
+          return;
         }
+        state.options.push({
+          id: nextOptionId++,
+          name: '',
+          values: []
+        });
+        renderOptionsList();
       };
     }
 
-    // Modal controls
-    const closeBtn = document.getElementById('close-create-product-modal-btn');
-    const cancelBtn = document.getElementById('cancel-create-product-btn');
-    const backdrop = document.getElementById('create-product-modal-backdrop');
-    const form = document.getElementById('create-product-form');
-
-    const handleClose = () => this.closeProductDetailsModal();
-    if (closeBtn) closeBtn.onclick = handleClose;
-    if (cancelBtn) cancelBtn.onclick = handleClose;
-    if (backdrop) {
-      backdrop.onclick = (e) => {
-        if (e.target === backdrop) handleClose();
+    // Sync prices button
+    if (syncPricesBtn) {
+      syncPricesBtn.onclick = () => {
+        const baseP = parseFloat(priceInput ? priceInput.value : state.price) || 0;
+        state.customMatrixData.forEach((val) => {
+          val.price = baseP;
+        });
+        // Clear custom price overrides so all follow base price
+        for (const [k, v] of state.customMatrixData.entries()) {
+          v.price = baseP;
+        }
+        renderMatrixTable();
+        this.showToast({ type: 'info', message: `All variant prices synchronized to $${baseP.toFixed(2)}.` });
       };
     }
 
-    if (form) {
-      form.onsubmit = async (e) => {
-        e.preventDefault();
-        const submitBtn = document.getElementById('submit-create-product-btn');
+    // Initial render
+    renderOptionsList();
+    renderMatrixTable();
+
+    // Submit handler: Form state aggregation & API execution
+    if (submitBtn) {
+      submitBtn.onclick = async () => {
         const feedback = document.getElementById('create-product-feedback');
+        const nameVal = nameInput ? nameInput.value.trim() : state.name;
+        const basePriceVal = priceInput ? parseFloat(priceInput.value) : state.price;
 
-        if (attributesList.length === 0) {
+        if (!nameVal) {
           if (feedback) {
             feedback.className = "text-xs py-2 px-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 block";
-            feedback.textContent = "Please add at least one product attribute (e.g. Size, Color).";
+            feedback.textContent = "Product Name is required.";
           }
+          if (nameInput) nameInput.focus();
           return;
         }
 
-        const name = document.getElementById('new-product-name')?.value.trim();
-        const price = parseFloat(document.getElementById('new-product-price')?.value || '0');
-        const isActive = document.getElementById('new-product-status')?.value === 'true';
-        const imageUrl = document.getElementById('new-product-image')?.value.trim() || null;
-        const description = document.getElementById('new-product-description')?.value.trim() || null;
-        const sku = document.getElementById('new-product-sku')?.value.trim() || `${name.replace(/\s+/g, '-').toUpperCase().slice(0, 8)}-01`;
-        const stock = parseInt(document.getElementById('new-product-stock')?.value || '10', 10);
+        if (isNaN(basePriceVal) || basePriceVal < 0) {
+          if (feedback) {
+            feedback.className = "text-xs py-2 px-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 block";
+            feedback.textContent = "Please enter a valid Base Price.";
+          }
+          if (priceInput) priceInput.focus();
+          return;
+        }
 
-        // Build default variant attributes map
-        const variantAttributes = {};
-        attributesList.forEach(a => {
-          variantAttributes[a] = 'Standard';
-        });
+        let attributesArray = [];
+        let variantsArray = [];
 
-        const productPayload = {
-          workspaceId: Number(workspaceId),
-          name,
-          price,
-          isActive,
-          imageUrl,
-          description,
-          attributes: attributesList,
-          productVariants: [
-            {
-              sku,
-              price,
-              stock: isNaN(stock) ? 10 : stock,
-              imageUrl,
-              attributes: variantAttributes
+        if (state.hasOptions) {
+          const combinations = computeCombinations();
+          const activeCombos = combinations.filter(combo => !state.excludedKeys.has(getComboKey(combo)));
+
+          if (activeCombos.length === 0) {
+            if (feedback) {
+              feedback.className = "text-xs py-2 px-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 block";
+              feedback.textContent = "Please define at least one option value to generate active variants.";
             }
-          ]
+            return;
+          }
+
+          // Attributes array: list of option dimension names (e.g. ["Size", "Color"])
+          attributesArray = state.options
+            .map(o => o.name.trim())
+            .filter(Boolean);
+
+          // Variants array: all active rows in the dynamic matrix
+          variantsArray = activeCombos.map(combo => {
+            const key = getComboKey(combo);
+            const custom = state.customMatrixData.get(key) || {};
+
+            const sku = custom.sku !== undefined ? custom.sku : buildSuggestedSku(combo);
+            const price = custom.price !== undefined ? parseFloat(custom.price) : basePriceVal;
+            const stock = (custom.stock !== undefined && custom.stock !== '') ? (parseInt(custom.stock, 10) || 0) : 0;
+            const variantImageUrl = (custom.imageUrl && custom.imageUrl.trim() !== '')
+              ? custom.imageUrl.trim()
+              : (state.imageUrl || null);
+
+            return {
+              sku: sku || `${nameVal.replace(/\s+/g, '-').toUpperCase().slice(0, 8)}-${Math.random().toString(36).slice(2, 6)}`,
+              price: isNaN(price) ? basePriceVal : price,
+              stock: isNaN(stock) ? 0 : stock,
+              imageUrl: variantImageUrl,
+              attributes: combo // Exact { Size: "M", Color: "Black" } object
+            };
+          });
+        } else {
+          // Single item without options
+          const singleSkuVal = document.getElementById('drawer-single-sku')?.value.trim() || `${nameVal.replace(/\s+/g, '-').toUpperCase().slice(0, 8)}-01`;
+          const singleStockVal = parseInt(document.getElementById('drawer-single-stock')?.value || '0', 10);
+          const singleImageVal = document.getElementById('drawer-single-image')?.value.trim() || state.imageUrl || null;
+
+          attributesArray = ['Default'];
+          variantsArray = [
+            {
+              sku: singleSkuVal,
+              price: basePriceVal,
+              stock: isNaN(singleStockVal) ? 0 : singleStockVal,
+              imageUrl: singleImageVal,
+              attributes: { Default: 'Standard' }
+            }
+          ];
+        }
+
+        // Aggregate Complete Payload matching Backend Schema
+        const payload = {
+          workspaceId: Number(workspaceId),
+          name: nameVal,
+          price: basePriceVal,
+          isActive: document.getElementById('drawer-product-status')?.value === 'true',
+          imageUrl: state.imageUrl || null,
+          description: document.getElementById('drawer-product-description')?.value.trim() || null,
+          attributes: attributesArray,
+          productVariants: variantsArray
         };
 
-        if (submitBtn) {
-          submitBtn.disabled = true;
-          submitBtn.innerHTML = `<svg class="animate-spin h-3.5 w-3.5 inline text-black mr-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Creating...`;
-        }
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<svg class="animate-spin h-3.5 w-3.5 inline text-black mr-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Saving Matrix...`;
 
         try {
           if (onSubmit) {
-            await onSubmit(productPayload);
+            await onSubmit(payload);
           }
-          this.closeProductDetailsModal();
+          closeDrawer();
         } catch (err) {
-          if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = `<i class="fa-solid fa-plus text-xs"></i><span>Create Product</span>`;
-          }
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = `<i class="fa-solid fa-plus text-xs"></i><span>Save Product</span>`;
           if (feedback) {
-            feedback.className = "text-xs py-2 px-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 block";
+            feedback.className = "text-xs py-2.5 px-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 block";
             feedback.textContent = err.serverMessage || err.message || "Failed to create product.";
           }
         }
       };
     }
+  }
+
+  /**
+   * Backward-compatible alias routing to the modern Option-to-Matrix slide-out drawer
+   */
+  openCreateProductModal(args) {
+    return this.openCreateProductDrawer(args);
   }
 
   _formatRoleLabel(role) {

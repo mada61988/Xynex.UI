@@ -446,11 +446,16 @@ export class DashboardController {
       this.view.showToast({ type: 'error', message: 'Please select a workspace before adding a product.' });
       return;
     }
-    this.view.openCreateProductModal({
+    const openFn = this.view.openCreateProductDrawer || this.view.openCreateProductModal;
+    openFn.call(this.view, {
       workspaceId: this.selectedProductsWorkspaceId,
       onSubmit: async (productData) => {
         await this.model.createProduct(productData);
-        this.view.showToast({ type: 'success', message: `Product "${productData.name}" created successfully!` });
+        const count = Array.isArray(productData.productVariants) ? productData.productVariants.length : 1;
+        this.view.showToast({ 
+          type: 'success', 
+          message: `Product "${productData.name}" with ${count} ${count === 1 ? 'variant' : 'variants'} created successfully!` 
+        });
         await this.loadWorkspaceProducts(this.selectedProductsWorkspaceId);
       }
     });
